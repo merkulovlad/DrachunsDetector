@@ -1,1 +1,12 @@
 .DS_Store
+
+# Model checkpoints and weights
+*.ckpt
+*.pt
+*.pth
+checkpoint/
+checkpoints/
+stream_platform/MoViNet-pytorch/
+
+# Python cache
+__pycache__/
