@@ -7,7 +7,7 @@ from stream_platform.backend.src.camera_loop import capture_loop
 from stream_platform.backend.utils.logger import get_logger, setup_logging
 
 NUM_CLASSES = 2
-DEFAULT_CLASS_NAMES = ["no_violence", "violence"]
+DEFAULT_CLASS_NAMES = ["violence", "no_violence"]
 
 
 def _extract_class_names(meta: Optional[Dict[str, Any]]) -> Optional[Sequence[str]]:

@@ -6,7 +6,7 @@ import os
 import torch
 from stream_platform.backend.utils.logger import get_logger
 
-CHECKPOINT_PATH = os.path.join(os.path.dirname(__file__), "movinet_final.pt")
+CHECKPOINT_PATH = os.path.join(os.path.dirname(__file__), "epoch009.pt")
 MODEL = MoViNet(_C.MODEL.MoViNetA0, causal = True, pretrained = False )
 
 def _detect_device() -> str:

@@ -13,9 +13,11 @@ from stream_platform.backend.utils.logger import get_logger
 # Number of seconds to skip inference after a no-violence prediction.
 SKIP_SECONDS_AFTER_CLEAR = 3.0
 T_FRAMES = 6
-URL = "rtsp://localhost:8554/mystream5"
-STRIDE = 1
+URL = "rtsp://localhost:8554/mystream2"
+CLIP_INTERVAL_SECONDS = 5.0
+CLIP_FRAME_COUNT = 30
 DEFAULT_POSITIVE_LABEL = "violence"
+MODEL_OUTPUT_CLASS_ORDER = ["no_violence", "violence"]
 
 logger = get_logger("camera_loop")
 DEVICE = "cuda" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "cpu"
@@ -33,6 +35,28 @@ def _normalize_class_names(
     if isinstance(class_names, (list, tuple)):
         return list(class_names)
     return None
+
+
+def _align_probabilities(
+    prob_list: List[float], class_names: Optional[List[str]]
+) -> List[float]:
+    """
+    Reorder the raw model probabilities (trained order) to match the
+    class_names order used by the application.
+    """
+    if not class_names:
+        return prob_list
+    if len(prob_list) != len(MODEL_OUTPUT_CLASS_ORDER):
+        return prob_list
+
+    source = [name.lower() for name in MODEL_OUTPUT_CLASS_ORDER]
+    target = [name.lower() for name in class_names]
+
+    if set(source) != set(target):
+        return prob_list
+
+    index_lookup = {name: idx for idx, name in enumerate(source)}
+    return [prob_list[index_lookup[name]] for name in target]
 
 
 def _resolve_positive_index(
@@ -55,7 +79,6 @@ def _resolve_positive_index(
 def capture_loop(
     model,
     url: str = URL,
-    T: int = T_FRAMES,
     logger=logger,
     *,
     class_names: Optional[Union[Sequence[str], dict]] = None,
@@ -63,12 +86,24 @@ def capture_loop(
     detection_threshold: float = 0.5,
     idle_threshold: float = 0.2,
     skip_seconds_after_clear: float = SKIP_SECONDS_AFTER_CLEAR,
+    clip_interval_seconds: float = CLIP_INTERVAL_SECONDS,
+    clip_frame_count: int = CLIP_FRAME_COUNT,
 ):
     class_names_list = _normalize_class_names(class_names)
     positive_idx = _resolve_positive_index(class_names_list, positive_label)
     positive_label_display = (
         class_names_list[positive_idx] if class_names_list else f"class {positive_idx}"
     )
+
+    if class_names_list and len(class_names_list) > 1:
+        negative_label_display = next(
+            (name for idx, name in enumerate(class_names_list) if idx != positive_idx),
+            "no_violence",
+        )
+    else:
+        negative_label_display = (
+            "no_violence" if positive_label_display.lower() != "no_violence" else "no"
+        )
 
     if class_names_list:
         logger.info(
@@ -83,10 +118,15 @@ def capture_loop(
         fps = 30.0
     skip_frames_after_clear = max(int(round(fps * skip_seconds_after_clear)), 1)
 
-    clip_queue: "queue.Queue[List]" = queue.Queue(maxsize=T_FRAMES)
+    clip_queue: "queue.Queue[List]" = queue.Queue(maxsize=clip_frame_count)
     result_lock = threading.Lock()
     result_state = {"data": None}
     stop_event = threading.Event()
+
+    # Determine how frequently to sample frames to reach clip_frame_count over clip_interval
+    frame_sample_interval = (
+        clip_interval_seconds / clip_frame_count if clip_frame_count > 0 else clip_interval_seconds
+    )
 
     def inference_worker():
         while not stop_event.is_set():
@@ -103,20 +143,38 @@ def capture_loop(
                 prob_vec = probs.squeeze(0).detach()
                 if prob_vec.device.type != "cpu":
                     prob_vec = prob_vec.cpu()
-                prob_list = [float(p) for p in prob_vec.tolist()]
-                top_idx = int(prob_vec.argmax().item())
-                positive_prob = (
-                    prob_list[0]
-                    if positive_idx >= len(prob_list)
-                    else prob_list[positive_idx]
+                raw_prob_list = [float(p) for p in prob_vec.tolist()]
+                prob_list = _align_probabilities(
+                    raw_prob_list, class_names_list
                 )
-                top_prob = prob_list[top_idx]
+                if prob_list:
+                    top_idx = max(
+                        range(len(prob_list)), key=prob_list.__getitem__
+                    )
+                    top_prob = prob_list[top_idx]
+                else:
+                    top_idx = 0
+                    top_prob = 0.0
+                if positive_idx >= len(prob_list):
+                    positive_prob = prob_list[0] if prob_list else 0.0
+                else:
+                    positive_prob = prob_list[positive_idx]
+                violence_prob = float(positive_prob)
+                is_violence = violence_prob >= detection_threshold
+                classification_label = (
+                    positive_label_display if is_violence else negative_label_display
+                )
+                classification_prob = violence_prob if is_violence else 1.0 - violence_prob
                 with result_lock:
                     result_state["data"] = {
                         "prob_list": prob_list,
-                        "positive_prob": float(positive_prob),
+                        "violence_prob": violence_prob,
+                        "positive_prob": violence_prob,
                         "top_idx": top_idx,
                         "top_prob": float(top_prob),
+                        "classification_label": classification_label,
+                        "classification_prob": float(classification_prob),
+                        "is_violence": is_violence,
                         "timestamp": time.time(),
                     }
             finally:
@@ -132,6 +190,8 @@ def capture_loop(
         detection_threshold=detection_threshold,
         idle_threshold=idle_threshold,
         skip_after_clear_seconds=skip_seconds_after_clear,
+        clip_interval_seconds=clip_interval_seconds,
+        clip_frame_count=clip_frame_count,
         estimated_fps=fps,
     )
 
@@ -139,12 +199,13 @@ def capture_loop(
         logger.error("Failed to open video capture", url=url)
         return
 
-    buf_frames = collections.deque(maxlen=T)
-    frame_idx = 0
+    buf_frames = collections.deque(maxlen=clip_frame_count or T_FRAMES)
     skip_left = 0
     status_text = "waiting..."
     status_color = (255, 255, 255)
     last_result_ts = 0.0
+    last_clip_submit_ts: Optional[float] = None
+    last_frame_added_ts: Optional[float] = None
 
     while True:
         ok, frame = cap.read()
@@ -158,8 +219,14 @@ def capture_loop(
             continue
 
         ts = time.time()
-        buf_frames.append(preprocess_frame(frame).clone())
-        frame_idx += 1
+        should_store_frame = (
+            last_frame_added_ts is None
+            or (ts - last_frame_added_ts) >= frame_sample_interval
+            or not buf_frames
+        )
+        if should_store_frame:
+            buf_frames.append(preprocess_frame(frame).clone())
+            last_frame_added_ts = ts
 
         ts_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
         cv2.putText(
@@ -175,11 +242,17 @@ def capture_loop(
         if skip_left > 0:
             skip_left -= 1
         elif (
-            len(buf_frames) == T
-            and (frame_idx % STRIDE == 0)
+            len(buf_frames) >= (clip_frame_count or T_FRAMES)
             and not clip_queue.full()
         ):
-            clip_queue.put([f.clone() for f in buf_frames])
+            if (
+                last_clip_submit_ts is None
+                or (ts - last_clip_submit_ts) >= clip_interval_seconds
+            ):
+                clip_queue.put([f.clone() for f in list(buf_frames)])
+                last_clip_submit_ts = ts
+                buf_frames.clear()
+                last_frame_added_ts = None
 
         with result_lock:
             latest = result_state["data"]
@@ -187,32 +260,25 @@ def capture_loop(
         if latest and latest["timestamp"] > last_result_ts:
             last_result_ts = latest["timestamp"]
             prob_list = latest["prob_list"]
-            positive_prob = latest["positive_prob"]
-            top_idx = latest["top_idx"]
-            top_prob = latest["top_prob"]
-            top_label = (
-                class_names_list[top_idx]
-                if class_names_list and top_idx < len(class_names_list)
-                else f"class {top_idx}"
-            )
-
-            status_text = f"{top_label}: {top_prob:.2f}"
-            status_color = (0, 255, 0)
+            violence_prob = latest["violence_prob"]
+            classification_label = latest["classification_label"]
+            is_violence = latest["is_violence"]
 
             logger.info(
                 "clip_probs",
                 probs=prob_list,
                 positive_idx=positive_idx,
                 positive_label=positive_label_display,
-                positive_prob=positive_prob,
-                top_label=top_label,
-                top_prob=top_prob,
+                violence_prob=violence_prob,
+                classification=classification_label,
+                threshold=detection_threshold,
             )
 
-            if positive_prob >= detection_threshold:
-                status_text = f"{positive_label_display.upper()} {positive_prob:.2f}"
+            status_text = f"{classification_label.upper()} {violence_prob:.2f}"
+            status_color = (0, 255, 0)
+            if is_violence:
                 status_color = (0, 0, 255)
-            elif positive_prob <= idle_threshold:
+            elif violence_prob <= idle_threshold:
                 skip_left = skip_frames_after_clear
 
         cv2.putText(
