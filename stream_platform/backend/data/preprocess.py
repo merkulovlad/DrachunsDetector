@@ -12,6 +12,6 @@ frame_tf = T.Compose([
 
 def preprocess_frame(bgr):
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    x = frame_tf(rgb)
+    x = frame_tf(rgb) / 255.0  # Match training pipeline scaling
     return x
     
