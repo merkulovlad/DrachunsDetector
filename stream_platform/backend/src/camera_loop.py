@@ -13,7 +13,7 @@ from stream_platform.backend.utils.logger import get_logger
 # Number of seconds to skip inference after a no-violence prediction.
 SKIP_SECONDS_AFTER_CLEAR = 3.0
 T_FRAMES = 6
-URL = "rtsp://localhost:8554/mystream2"
+URL = "rtsp://localhost:8554/mystream3"
 CLIP_INTERVAL_SECONDS = 5.0
 CLIP_FRAME_COUNT = 30
 DEFAULT_POSITIVE_LABEL = "violence"
@@ -83,7 +83,7 @@ def capture_loop(
     *,
     class_names: Optional[Union[Sequence[str], dict]] = None,
     positive_label: str = DEFAULT_POSITIVE_LABEL,
-    detection_threshold: float = 0.5,
+    detection_threshold: float = 0.47,
     idle_threshold: float = 0.2,
     skip_seconds_after_clear: float = SKIP_SECONDS_AFTER_CLEAR,
     clip_interval_seconds: float = CLIP_INTERVAL_SECONDS,
