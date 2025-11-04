@@ -2,11 +2,11 @@
 
 # Model checkpoints and weights
 *.ckpt
-*.pt
 *.pth
 checkpoint/
 checkpoints/
 stream_platform/MoViNet-pytorch/
-
 # Python cache
 __pycache__/
+.docker-compose.yml
+.Dockerfile

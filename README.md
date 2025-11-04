@@ -20,7 +20,7 @@ By automatically identifying violent behavior, the system aims to:
   - Install Python 3.10+ and create/activate your virtual environment (e.g., `conda activate <env>` or `python -m venv .venv && source .venv/bin/activate`).
   - Install FFmpeg (`brew install ffmpeg` on macOS, `sudo apt install ffmpeg` on Ubuntu/Debian).
   - Install project dependencies with `pip install -r requirements.txt`.
-
+  
 - **Start the MediaMTX relay**
   ```bash
   docker rm -f mediamtx 2>/dev/null || true
@@ -53,7 +53,8 @@ By automatically identifying violent behavior, the system aims to:
 
 - **Run the backend**
   ```bash
-  python -m stream_platform.backend.src.main
+  cd stream_platform
+  python -m backend.src.main
   ```
   The service connects to the RTSP stream (`rtsp://localhost:8554/mystream3`), performs inference, and reports detections in the console.
 
