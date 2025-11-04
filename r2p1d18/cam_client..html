@@ -1,0 +1,211 @@
+<!doctype html><meta charset="utf-8">
+<title>Realtime fight detection</title>
+<style>
+  body { font-family: system-ui, Arial, sans-serif; margin: 20px; }
+  video,canvas,img { max-width: 480px; width: 100%; background:#000; }
+  .row { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
+  .col { flex:1 1 420px; min-width: 320px; }
+  .panel { border:1px solid #ddd; border-radius:10px; padding:16px; }
+  button { padding:8px 14px; border-radius:8px; border:1px solid #ccc; background:#fafafa; cursor:pointer;}
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; margin-top:8px; }
+  pre { white-space: pre-wrap; background:#111; color:#0f0; padding:8px; border-radius:6px; height:160px; overflow:auto; }
+  ul { margin:0; padding-left:1.2em; }
+</style>
+
+<h2>Realtime fight detection</h2>
+
+<div class="row">
+  <!-- Realtime panel -->
+  <div class="col panel">
+    <h3>Realtime (WebSocket from browser webcam)</h3>
+    <video id="v" autoplay playsinline muted></video>
+    <div class="kv">
+      <div><strong>Send FPS:</strong></div><div><span id="sendFps">0</span> fps</div>
+      <div><strong>Pred FPS:</strong></div><div><span id="predFps">0</span> fps</div>
+      <div><strong>Last prediction:</strong></div><div><span id="lastPred">–</span></div>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:10px;">
+      <button id="startBtn">Start</button>
+      <button id="stopBtn" disabled>Stop</button>
+    </div>
+    <pre id="log"></pre>
+  </div>
+
+  <!-- Offline upload analysis -->
+  <div class="col panel">
+    <h3>Upload & analyze a video (offline)</h3>
+    <input type="file" id="fileInput" accept="video/*" />
+    <div style="margin-top:10px; display:flex; gap:10px;">
+      <button id="analyzeBtn" disabled>Analyze</button>
+      <label>Stride frames: <input id="strideInput" type="number" value="8" min="1" style="width:80px;"></label>
+      <label>Threshold: <input id="thrInput" type="number" value="0.5" min="0" max="1" step="0.01" style="width:80px;"></label>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div class="col">
+        <h4>Original Video</h4>
+        <video id="uploadPreview" controls></video>
+      </div>
+      <div class="col">
+        <h4>Probability Plot (matplotlib)</h4>
+        <img id="plotImg" alt="Plot will appear here">
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <h4>Frames flagged as “Fight”</h4>
+      <div id="fightFrames">–</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WS_URL = "ws://localhost:8000/ws-frames"; // change if server is remote
+const FPS = 10;                // client-side capture rate
+const JPEG_QUALITY = 0.8;      // 0..1
+
+const video = document.getElementById('v');
+const logEl = document.getElementById('log');
+const sendFpsEl = document.getElementById('sendFps');
+const predFpsEl = document.getElementById('predFps');
+const lastPredEl = document.getElementById('lastPred');
+const startBtn = document.getElementById('startBtn');
+const stopBtn  = document.getElementById('stopBtn');
+
+const fileInput = document.getElementById('fileInput');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const uploadPreview = document.getElementById('uploadPreview');
+const plotImg = document.getElementById('plotImg');
+const fightFrames = document.getElementById('fightFrames');
+const strideInput = document.getElementById('strideInput');
+const thrInput = document.getElementById('thrInput');
+
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d', {willReadFrequently: true});
+function logln(s){ logEl.textContent += s + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+
+let intervalId = null;
+let ws = null;
+let stream = null;
+
+// FPS measurement
+let sentFrames = 0, predMsgs = 0;
+setInterval(() => {
+  sendFpsEl.textContent = sentFrames.toFixed(0);
+  predFpsEl.textContent = predMsgs.toFixed(0);
+  sentFrames = 0; predMsgs = 0;
+}, 1000);
+
+async function startRealtime() {
+  try {
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+
+    stream = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480}, audio: false});
+    video.srcObject = stream;
+    await video.play();
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    ws = new WebSocket(WS_URL);
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({stride_frames: 8})); // optional config
+      logln("[ws] connected");
+    };
+    ws.onmessage = (e) => {
+      predMsgs++;
+      lastPredEl.textContent = e.data;
+      logln(`[pred] ${e.data}`);
+    };
+    ws.onclose = () => { logln("[ws] closed"); };
+    ws.onerror = () => { logln("[ws] error"); };
+
+    const interval = 1000 / FPS;
+    intervalId = setInterval(() => {
+      try {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            blob.arrayBuffer().then(ab => { ws.send(ab); sentFrames++; });
+          }
+        }, "image/jpeg", JPEG_QUALITY);
+      } catch (err) {
+        logln("capture error: " + err);
+      }
+    }, interval);
+  } catch (err) {
+    logln(err);
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  }
+}
+
+function stopRealtime() {
+  stopBtn.disabled = true;
+  startBtn.disabled = false;
+
+  if (intervalId) { clearInterval(intervalId); intervalId = null; }
+  if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); }
+  ws = null;
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+}
+
+startBtn.addEventListener('click', startRealtime);
+stopBtn.addEventListener('click', stopRealtime);
+
+// --- Upload & analyze (offline) ---
+fileInput.addEventListener('change', () => {
+  analyzeBtn.disabled = !fileInput.files?.length;
+  if (fileInput.files?.length) {
+    const url = URL.createObjectURL(fileInput.files[0]);
+    uploadPreview.src = url;
+  } else {
+    uploadPreview.removeAttribute('src');
+  }
+});
+
+analyzeBtn.addEventListener('click', async () => {
+  const f = fileInput.files?.[0];
+  if (!f) return;
+  analyzeBtn.disabled = true;
+
+  try {
+    const form = new FormData();
+    form.append('file', f);
+    form.append('stride_frames', String(parseInt(strideInput.value || '8', 10)));
+    form.append('threshold', String(parseFloat(thrInput.value || '0.5')));
+
+    const r = await fetch('http://localhost:8000/analyze-file', {
+      method: 'POST',
+      body: form
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(txt);
+    }
+    const data = await r.json();
+
+    // show PNG plot
+    plotImg.src = 'data:image/png;base64,' + data.plot_png_b64;
+
+    // show frames flagged as fight
+    if (data.fight_frames && data.fight_frames.length) {
+      const lis = data.fight_frames.slice(0, 500).map(fr => `<li>frame ${fr}</li>`).join('');
+      fightFrames.innerHTML = `<ul>${lis}</ul>` + (data.fight_frames.length > 500 ? "<p>…truncated…</p>" : "");
+    } else {
+      fightFrames.textContent = "None above threshold";
+    }
+  } catch (e) {
+    alert("Analyze failed: " + e.message);
+  } finally {
+    analyzeBtn.disabled = false;
+  }
+});
+</script>
