@@ -62,3 +62,7 @@ By automatically identifying violent behavior, the system aims to:
   - Confirm the MediaMTX container logs show the RTSP client connection.
   - Watch the FFmpeg output to ensure frames are being published without errors.
   - In the Python process, look for log lines that mention frames being processed and detection results. If you enabled tracing or saved outputs in the configuration, check those locations as well.
+
+- **Docker is temporarily unavailable**
+  - Note: Docker support for this application has not been implemented yet due to issues with webcam integration and lack of GUI support for OpenCV (`cv2`) inside Docker.
+

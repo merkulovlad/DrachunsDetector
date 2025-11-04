@@ -8,5 +8,3 @@ checkpoints/
 stream_platform/MoViNet-pytorch/
 # Python cache
 __pycache__/
-.docker-compose.yml
-.Dockerfile
