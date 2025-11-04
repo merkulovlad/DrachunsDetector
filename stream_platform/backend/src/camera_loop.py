@@ -1,23 +1,27 @@
 import collections
 import queue
+import os
+import socket 
 import threading
 import time
+from urllib.parse import urlparse
 from typing import List, Optional, Sequence, Union
 
 import cv2
 
-from stream_platform.backend.data.preprocess import preprocess_frame
-from stream_platform.backend.src.infer import run_inference
-from stream_platform.backend.utils.logger import get_logger
+from backend.data.preprocess import preprocess_frame
+from backend.src.infer import run_inference
+from backend.utils.logger import get_logger
 
 # Number of seconds to skip inference after a no-violence prediction.
 SKIP_SECONDS_AFTER_CLEAR = 3.0
 T_FRAMES = 6
-URL = "rtsp://localhost:8554/mystream3"
+URL = os.getenv("RTSP_URL", "rtsp://localhost:8554/mystream3")
 CLIP_INTERVAL_SECONDS = 5.0
 CLIP_FRAME_COUNT = 30
 DEFAULT_POSITIVE_LABEL = "violence"
 MODEL_OUTPUT_CLASS_ORDER = ["no_violence", "violence"]
+MAX_TIME_TO_WAIT_CAMERA_FROM_MEDIAMTX = 60 # seconds 
 
 logger = get_logger("camera_loop")
 DEVICE = "cuda" if cv2.cuda.getCudaEnabledDeviceCount() > 0 else "cpu"
@@ -196,9 +200,15 @@ def capture_loop(
     )
 
     if not cap.isOpened():
-        logger.error("Failed to open video capture", url=url)
-        return
-
+        parsed = urlparse(url)
+        started_wait = time.time()
+        while not cap.isOpened():
+            time.sleep(20.0)
+            if time.time() - started_wait > MAX_TIME_TO_WAIT_CAMERA_FROM_MEDIAMTX:
+                logger.error("Timeout waiting for camera to be available", url=url)
+                return
+            logger.info("Waiting for camera to be available")
+            cap.open(url)
     buf_frames = collections.deque(maxlen=clip_frame_count or T_FRAMES)
     skip_left = 0
     status_text = "waiting..."

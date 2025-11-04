@@ -1,10 +1,10 @@
 import os
 from typing import Any, Dict, Optional, Sequence
 
-from stream_platform.backend.models.load_model import build_movinet_a0_stream
-from stream_platform.backend.models.model_infer import download_model
-from stream_platform.backend.src.camera_loop import capture_loop
-from stream_platform.backend.utils.logger import get_logger, setup_logging
+from backend.models.load_model import build_movinet_a0_stream
+from backend.models.model_infer import download_model
+from backend.src.camera_loop import capture_loop
+from backend.utils.logger import get_logger, setup_logging
 
 NUM_CLASSES = 2
 DEFAULT_CLASS_NAMES = ["violence", "no_violence"]
