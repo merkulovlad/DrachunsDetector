@@ -8,25 +8,23 @@ class PoseConfig:
     imgsz: int = 640
     conf: float = 0.25
     iou: float = 0.5
-    device: str = "cpu"  # "cpu" or "cuda" 
+    device: str = "cpu" 
     max_det: int = 50
 
 @dataclass
 class TrackConfig:
     max_age: int = 30        # frames to keep lost track
     min_hits: int = 5       # confirmations before reporting a track
-    iou_threshold: float = 0.0  # Now works correctly with fixed logic
+    iou_threshold: float = 0.0  
 
 @dataclass
 class FeatureConfig:
     seq_len: int = 30        # frames per clip window (1-2s @ 15-30fps)
     stride: int = 15         # overlap stride between clips
-    kp_count: int = 17       # COCO-style keypoints
-    smooth_sigma: float = 0.0  # no gaussian smoothing by default
-
+    
 @dataclass
 class TrainConfig:
-    batch_size: int = 16
+    batch_size: int = 32
     lr: float = 1e-3
     max_epochs: int = 10
     hidden_size: int = 128
@@ -34,10 +32,8 @@ class TrainConfig:
     dropout: float = 0.2
     num_classes: int = 2
     workers: int = 0
-    # Device configs - separate for pose vs model training
-    pose_device: str = "cpu"      # YOLO-Pose (CPU for compatibility)
-    model_device: str = "mps"    # BiLSTM model (auto-detect best available)
-    joint_dropout = 0.1 
+    model_device: str = "mps"  
+    joint_dropout: float = 0.1
 
 @dataclass
 class RuntimeConfig:
