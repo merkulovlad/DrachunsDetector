@@ -71,26 +71,24 @@ class Tracker:
 
     def step(self, detections):
         # detections: list of (bbox, score, cls, kps(17x3))
-        # Predict existing
         for t in self.tracks:
             t.predict()
 
         if len(detections)==0 and len(self.tracks)==0:
             return []
 
-        # Match
         cost = np.ones((len(self.tracks), len(detections))) * 1.0
         for i,t in enumerate(self.tracks):
             tb = t.get_bbox()
             for j,d in enumerate(detections):
                 db = d[0]
-                cost[i,j] = 1 - iou(tb, db)  # Cost = 1 - IoU (lower is better)
+                cost[i,j] = 1 - iou(tb, db) 
         if len(self.tracks)>0 and len(detections)>0:
             r,c = linear_sum_assignment(cost)
             assigned = set()
             used_tracks = set()
             for i,j in zip(r,c):
-                if cost[i,j] <= (1 - self.iou_threshold):  # Fixed: IoU >= threshold
+                if cost[i,j] <= (1 - self.iou_threshold):
                     self.tracks[i].update(detections[j][0], detections[j][3])
                     assigned.add(j); used_tracks.add(i)
             # new tracks for unassigned detections

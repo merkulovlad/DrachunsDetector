@@ -1,7 +1,15 @@
-# FastAPI Violence Detection System
+# FastAPI Violence Detection Service
 
-A comprehensive web-based violence detection system with multiple deep learning models (skeleton-, CNN-, and transformer-based), offering both real-time streaming and offline video analysis capabilities.
+Concise guide for running and using the FastAPI wrapper around the violence detection models.
 
+## Overview
+- Two models: ST-GCN (skeleton-based) and MoViNet (video-based).
+- Two modes: live monitoring (`/live`) and offline analysis (`/offline`).
+- Built with FastAPI, WebSockets, MJPEG streaming, and background tasks.
+
+## Quick start
+1) Ensure Python 3.10+. From `app/`, install dependencies:
+```
 ## 🎯 Features
 
 ### Multiple Detection Models
@@ -84,6 +92,16 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 cd app
 pip install -r requirements.txt
 ```
+2) Create your env file and set checkpoint paths:
+```
+cp .env.example .env
+# edit .env to point to model weights and data directories
+```
+3) Launch the service:
+```
+./start.sh
+```
+4) Open the UI at `http://localhost:8000/live` (live) or `http://localhost:8000/offline` (uploads). API docs: `http://localhost:8000/docs`.
 
 **Note**: This installs all detector dependencies (ST-GCN, MoViNet, R2P1, ViViT, and VideoMAE). The MoViNet library is installed directly from GitHub alongside Hugging Face's `transformers`.
 
@@ -273,227 +291,32 @@ with open('processed.mp4', 'wb') as f:
     f.write(video.content)
 ```
 
-## 🔧 API Endpoints
+## Key endpoints
+- Live monitoring: `/live`, `/api/live/stream` (WebSocket), `/api/live/camera/stream` (MJPEG), `/api/live/status`.
+- Offline processing: `/offline`, `/api/offline/upload`, `/api/offline/status/{job_id}`, `/api/offline/result/{job_id}`, `/api/offline/download/{job_id}`.
+- Model control: `/api/model/select`, `/api/model/current`.
 
-### Live Streaming
+## Configuration
+- `.env` controls model paths, device selection, and server settings.
+- `core/config.py` centralizes defaults.
+- `start.sh` applies sensible defaults and starts Uvicorn.
 
-- `GET /live` - Live monitor page
-- `GET /api/live/camera/start` - Start local camera
-- `GET /api/live/camera/stop` - Stop camera
-- `GET /api/live/camera/stream` - MJPEG stream endpoint
-- `WS /api/live/stream` - WebSocket for bidirectional streaming
-- `GET /api/live/status` - Get stream status
-
-### Offline Processing
-
-- `GET /offline` - Offline analyzer page
-- `POST /api/offline/upload` - Upload video for processing
-- `GET /api/offline/status/{job_id}` - Get job status
-- `GET /api/offline/result/{job_id}` - Get job results
-- `GET /api/offline/download/{job_id}` - Download processed video
-- `GET /api/offline/jobs` - List all jobs
-- `DELETE /api/offline/job/{job_id}` - Delete job
-
-### Model Management
-
-- `POST /api/model/select` - Select active model
-- `GET /api/model/current` - Get current model
-
-## 🎨 Model Details
-
-### Model A: ST-GCN (Skeleton-Based)
-
-**How it works:**
-1. YOLO pose estimation detects persons and extracts 17 keypoints
-2. Multi-object tracking assigns IDs to persons across frames
-3. Skeleton sequences are built from tracked keypoints
-4. ST-GCN processes skeleton graph sequences for violence classification
-
-**Advantages:**
-- Privacy-preserving (works on skeleton data)
-- Robust to appearance changes
-- Focuses on motion patterns
-
-**Configuration:**
-- Sequence length: 30 frames
-- Stride: 15 frames
-- Default threshold: 0.8
-
-### Model B: MoViNet (Video-Based)
-
-**How it works:**
-1. Frames are preprocessed and collected into clips
-2. MoViNet processes temporal video clips
-3. Streaming architecture maintains temporal context
-4. Outputs violence probability per clip
-
-**Advantages:**
-- Holistic scene understanding
-- Efficient streaming architecture
-- Pre-trained on large video datasets
-
-**Configuration:**
-- Clip length: 6 frames
-- Default threshold: 0.47
-
-## 🛠️ Configuration Options
-
-### `app/core/config.py`
-
-```python
-class Settings:
-    # Model A (ST-GCN)
-    model_a_checkpoint: str
-    model_a_pose_weights: str = "yolov8n-pose.pt"
-    model_a_device: str = "cpu"
-    model_a_seq_len: int = 30
-    model_a_stride: int = 15
-    model_a_threshold: float = 0.8
-    
-    # Model B (MoViNet)
-    model_b_checkpoint: str
-    model_b_device: str = "cpu"
-    model_b_clip_length: int = 6
-    model_b_threshold: float = 0.47
-    
-    # Server
-    host: str = "0.0.0.0"
-    port: int = 8000
-    debug: bool = False
+## Project structure (app/)
+```
+app/
+├── main.py              # FastAPI entrypoint
+├── api/                 # Live and offline route handlers
+├── models/              # Wrappers: ST-GCN (violence_a), MoViNet (violence_b)
+├── core/                # Settings and model manager
+├── templates/           # live.html, offline.html
+├── static/              # Assets placeholder
+├── uploads/             # Temp uploads
+├── outputs/             # Processed outputs
+├── start.sh             # Launch script
+└── run_example.py       # Minimal init example
 ```
 
-## 🐛 Troubleshooting
-
-### Models Not Loading
-
-**Issue**: "Model X not initialized"
-
-**Solutions**:
-- Verify checkpoint paths are correct
-- Ensure checkpoint files exist and are accessible
-- Check file permissions
-- Review logs for specific error messages
-
-### Camera Not Starting
-
-**Issue**: Camera stream not working
-
-**Solutions**:
-- Check if another application is using the camera
-- Verify camera permissions (browser/system)
-- Try a different camera index (0, 1, 2...)
-- Check browser console for errors
-
-### WebSocket Connection Failed
-
-**Issue**: Browser capture not working
-
-**Solutions**:
-- Ensure server is running on correct port
-- Check firewall settings
-- Use HTTPS for secure contexts (required on some browsers)
-- Verify WebSocket URL format
-
-### Slow Processing
-
-**Issue**: Video processing is slow
-
-**Solutions**:
-- Use GPU: Set `device="cuda"` in config
-- Reduce video resolution before upload
-- Use Model B (generally faster than Model A)
-- Adjust model parameters (seq_len, stride for Model A)
-
-### Import Errors
-
-**Issue**: Module not found errors
-
-**Solutions**:
-```bash
-# Ensure paths are correctly added
-export PYTHONPATH="${PYTHONPATH}:/Users/vladislav/DrachunsDetector"
-
-# Reinstall dependencies
-pip install -r requirements.txt --force-reinstall
-```
-
-## 📊 Performance Notes
-
-### Model A (ST-GCN)
-- **Speed**: ~15-30 FPS (CPU), ~60+ FPS (GPU)
-- **Memory**: ~2-4 GB
-- **Best for**: Crowded scenes, privacy-sensitive applications
-
-### Model B (MoViNet)
-- **Speed**: ~20-40 FPS (CPU), ~80+ FPS (GPU)
-- **Memory**: ~3-6 GB
-- **Best for**: General purpose, outdoor scenes
-
-## 🔒 Security Considerations
-
-1. **File Upload**: Validate file types and sizes
-2. **CORS**: Configure appropriate origins in production
-3. **Authentication**: Add authentication middleware for production
-4. **HTTPS**: Use SSL/TLS for production deployments
-5. **File Cleanup**: Implement automatic cleanup of old uploads/outputs
-
-## 📝 Development
-
-### Adding a New Model
-
-1. Create wrapper class in `app/models/violence_c.py`
-2. Implement required methods: `__init__`, `process_frame`, `reset`
-3. Add configuration to `app/core/config.py`
-4. Update `ModelManager` in `app/core/model_manager.py`
-5. Update frontend dropdowns to include new model
-
-### Running Tests
-
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio httpx
-
-# Run tests
-pytest tests/
-```
-
-## 🤝 Contributing
-
-This is a project-specific implementation. For contributions:
-
-1. Follow PEP 8 style guide
-2. Add type hints
-3. Update documentation
-4. Test thoroughly before committing
-
-## 📄 License
-
-[Specify your license]
-
-## 🙏 Acknowledgments
-
-- **YOLO**: Ultralytics YOLOv8
-- **ST-GCN**: Spatial Temporal Graph Convolutional Networks
-- **MoViNet**: Mobile Video Networks
-- **FastAPI**: Modern web framework
-- **OpenCV**: Computer vision library
-
-## 📞 Support
-
-For issues and questions:
-- Check the troubleshooting section
-- Review API documentation at `/docs`
-- Check logs for error messages
-
-## 🔄 Version History
-
-### v1.0.0 (Current)
-- Initial release
-- Two model support (ST-GCN, MoViNet)
-- Live and offline processing
-- WebSocket and MJPEG streaming
-- Background job processing
-
----
-
-**Built with ❤️ using FastAPI, PyTorch, and OpenCV**
+## Notes
+- Requires model checkpoints for both models; set paths in `.env`.
+- Background tasks are used for offline jobs; progress is reported via `/api/offline/status/{job_id}`.
+- For production, run behind a process manager (e.g., systemd, supervisord) and place a reverse proxy (e.g., Nginx) in front of Uvicorn.
