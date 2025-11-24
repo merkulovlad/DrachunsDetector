@@ -19,19 +19,31 @@ from tracking import Tracker
 CONF_THRESH = 0.2
 MIN_SCALE = 1e-2
 MAX_RADIUS = 2.0
+COCO_EDGES = [
+    (0, 1), (0, 2), (1, 3), (2, 4),
+    (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),
+    (11, 12), (5, 11), (6, 12),
+    (11, 13), (13, 15), (12, 14), (14, 16),
+]
 
 
-def build_coco_adjacency(num_joints: int = 17):
-    edges = [
-        (0, 1), (0, 2), (1, 3), (2, 4),
-        (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),
-        (11, 12), (5, 11), (6, 12),
-        (11, 13), (13, 15), (12, 14), (14, 16),
-    ]
-    A = torch.eye(num_joints)
-    for i, j in edges:
-        A[i, j] = 1
-        A[j, i] = 1
+def build_multi_adjacency(num_persons: int, joints_per_person: int = 17):
+    """Block-diagonal COCO adjacency + hip connections between persons."""
+    V = num_persons * joints_per_person
+    A = torch.eye(V)
+    for p in range(num_persons):
+        offset = p * joints_per_person
+        for i, j in COCO_EDGES:
+            A[offset + i, offset + j] = 1
+            A[offset + j, offset + i] = 1
+    hips = [11, 12]
+    for pa in range(num_persons):
+        for pb in range(pa + 1, num_persons):
+            oa = pa * joints_per_person
+            ob = pb * joints_per_person
+            for h in hips:
+                A[oa + h, ob + h] = 1
+                A[ob + h, oa + h] = 1
     D = torch.diag(1.0 / torch.clamp(A.sum(dim=1), min=1.0))
     return D @ A
 
@@ -64,10 +76,12 @@ class GraphConv(nn.Module):
         return x + res
 
 
-class STGCNClassifier(nn.Module):
-    def __init__(self, num_classes=2, in_channels=7, graph_nodes=17, base_channels=64, dropout=0.5):
+class MultiPersonSTGCN(nn.Module):
+    def __init__(self, num_classes=2, in_channels=7, num_persons=3, graph_nodes=None, base_channels=64, dropout=0.5):
         super().__init__()
-        A = build_coco_adjacency(graph_nodes)
+        if graph_nodes is None:
+            graph_nodes = num_persons * 17
+        A = build_multi_adjacency(num_persons=num_persons, joints_per_person=graph_nodes // num_persons)
         self.register_buffer("A", A)
         channels = [base_channels, base_channels, base_channels, 2 * base_channels, 2 * base_channels, 4 * base_channels]
         strides = [1, 1, 1, 2, 1, 2]
@@ -97,12 +111,16 @@ def load_classifier(ckpt_path: str | None, device: str):
     metadata = {
         "num_classes": state.get("num_classes", 2),
         "in_channels": state.get("in_channels", 7),
+        "graph_nodes": state.get("graph_nodes"),
+        "num_persons": state.get("num_persons", 3),
         "base_channels": state.get("base_channels", 64),
         "dropout": state.get("dropout", 0.5),
     }
-    model = STGCNClassifier(
+    model = MultiPersonSTGCN(
         num_classes=metadata["num_classes"],
         in_channels=metadata["in_channels"],
+        num_persons=metadata["num_persons"],
+        graph_nodes=metadata["graph_nodes"],
         base_channels=metadata["base_channels"],
         dropout=metadata["dropout"],
     ).to(device)
@@ -111,13 +129,12 @@ def load_classifier(ckpt_path: str | None, device: str):
     return model, metadata
 
 
-def build_skeleton_tensor(track_seq, seq_len, frame_shape):
-    if not track_seq:
-        return np.zeros((seq_len, 17, 7), dtype=np.float32)
+def _normalize_track(track_seq: list[np.ndarray], frame_shape, seq_len: int) -> np.ndarray:
+    """Pad/trim a track and build 7-channel skeleton (coords/vel/acc/conf)."""
     H, W = frame_shape
     seq = list(track_seq)[-seq_len:]
     if len(seq) < seq_len:
-        pad_template = np.zeros((17, 3), dtype=np.float32)
+        pad_template = np.zeros_like(seq[0]) if seq else np.zeros((17, 3), dtype=np.float32)
         seq = seq + [pad_template.copy() for _ in range(seq_len - len(seq))]
     skeleton = np.stack(seq, axis=0).astype(np.float32)
     skeleton[..., 0] /= max(W, 1e-6)
@@ -146,22 +163,31 @@ def build_skeleton_tensor(track_seq, seq_len, frame_shape):
     acc = np.zeros_like(coords)
     acc[2:] = vel[2:] - vel[1:-1]
 
-    skeleton_aug = np.concatenate([coords, vel, acc, conf], axis=-1)
+    skeleton_aug = np.concatenate([coords, vel, acc, conf], axis=-1)  # (T, 17, 7)
     return skeleton_aug
 
 
-def pick_best_track(histories, min_len):
-    best_tid = None
-    best_score = (-1, -1.0)
-    for tid, hist in histories.items():
+def build_multi_skeleton_tensor(track_histories, seq_len, frame_shape, max_persons, min_len):
+    candidates = []
+    for tid, hist in track_histories.items():
         if len(hist) < min_len:
             continue
         conf = np.mean([kp[:, 2].mean() for kp in hist])
-        score = (len(hist), conf)
-        if score > best_score:
-            best_tid = tid
-            best_score = score
-    return best_tid
+        candidates.append((len(hist), conf, tid, hist))
+    if not candidates:
+        return np.zeros((7, seq_len, max_persons * 17), dtype=np.float32)
+    candidates.sort(reverse=True)
+    selected = candidates[:max_persons]
+    tracks_norm = []
+    for _, _, _, hist in selected:
+        tracks_norm.append(_normalize_track(list(hist), frame_shape, seq_len))
+    while len(tracks_norm) < max_persons:
+        tracks_norm.append(np.zeros((seq_len, 17, 7), dtype=np.float32))
+    stack = np.stack(tracks_norm, axis=0)  # (P, T, 17, 7)
+    stack = np.transpose(stack, (0, 3, 1, 2))  # (P, C, T, V)
+    stack = stack.transpose(1, 2, 0, 3)  # (C, T, P, V)
+    stack = stack.reshape(7, seq_len, max_persons * 17)
+    return stack.astype(np.float32, copy=False)
 
 
 def inference_worker(work_queue: Queue, result_state: dict, lock: threading.Lock, clf: nn.Module, device: str):
@@ -171,7 +197,7 @@ def inference_worker(work_queue: Queue, result_state: dict, lock: threading.Lock
             work_queue.task_done()
             break
         idx, skeleton = item
-        tensor = torch.from_numpy(skeleton).unsqueeze(0).to(device)
+        tensor = torch.from_numpy(skeleton).unsqueeze(0).to(device)  # (1, C, T, V)
         with torch.no_grad():
             logits = clf(tensor)
             probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
@@ -181,7 +207,7 @@ def inference_worker(work_queue: Queue, result_state: dict, lock: threading.Lock
         work_queue.task_done()
 
 
-def detection_worker(frame_queue: Queue, result_queue: Queue, pose: PoseEstimator, tracker: Tracker):
+def detection_worker(frame_queue: Queue, result_queue: Queue, pose: PoseEstimator, tracker: Tracker, max_persons: int):
     while True:
         item = frame_queue.get()
         if item is None:
@@ -189,13 +215,14 @@ def detection_worker(frame_queue: Queue, result_queue: Queue, pose: PoseEstimato
             break
         frame_idx, frame = item
         detections = pose.infer(frame)
+        detections = sorted(detections, key=lambda d: d[1], reverse=True)[:max_persons]
         tracks = tracker.step(detections)
         result_queue.put((frame_idx, tracks, frame.shape[:2]))
         frame_queue.task_done()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Async ST-GCN violence inference demo.")
+    parser = argparse.ArgumentParser(description="Async ST-GCN violence inference demo (multi-person).")
     parser.add_argument("--video", required=True, help="Path to video file.")
     parser.add_argument("--weights", default="yolov8n-pose.pt", help="Pose weights.")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu", help="Device for models.")
@@ -206,18 +233,23 @@ def main():
     parser.add_argument("--write-out", default=None, help="Optional annotated video path.")
     parser.add_argument("--queue-size", type=int, default=4, help="Skeleton inference queue size.")
     parser.add_argument("--det-queue-size", type=int, default=3, help="Frame queue size for detection worker.")
+    parser.add_argument("--max-persons", type=int, default=3, help="Max people to keep per frame/window.")
     args = parser.parse_args()
 
-    video_path = Path(args.video)
-    if not video_path.is_file():
-        raise FileNotFoundError(f"Input video not found: {video_path}")
+    video_arg = args.video
+    if video_arg.isdigit():
+        video_path = int(video_arg)  # webcam index
+    else:
+        video_path = Path(video_arg)
+        if not video_path.is_file():
+            raise FileNotFoundError(f"Input video not found: {video_path}")
 
     pose_cfg = PoseConfig(weights=args.weights, device=args.device)
     track_cfg = TrackConfig()
     feat_cfg = FeatureConfig(seq_len=args.seq_len, stride=args.stride)
     run_cfg = RuntimeConfig(alert_threshold=args.threshold)
 
-    fs = FrameSource(str(video_path))
+    fs = FrameSource(video_path)
     pose = PoseEstimator(
         weights=pose_cfg.weights,
         imgsz=pose_cfg.imgsz,
@@ -260,7 +292,7 @@ def main():
     result_queue: Queue = Queue(maxsize=args.det_queue_size * 2)
     det_thread = threading.Thread(
         target=detection_worker,
-        args=(frame_queue, result_queue, pose, tracker),
+        args=(frame_queue, result_queue, pose, tracker, args.max_persons),
         daemon=True,
     )
     det_thread.start()
@@ -276,7 +308,6 @@ def main():
     window_counter = 0
     min_len = max(4, feat_cfg.seq_len // 2)
     latest_tracks = []
-    latest_tracks_frame = -1
     frame_shape = None
 
     try:
@@ -290,7 +321,6 @@ def main():
             except Full:
                 pass
 
-            # ingest detection results
             while True:
                 try:
                     proc_idx, tracks, det_shape = result_queue.get_nowait()
@@ -307,7 +337,6 @@ def main():
                     track_last_seen.pop(tid, None)
 
                 latest_tracks = tracks
-                latest_tracks_frame = proc_idx
 
                 if (
                     frame_shape is not None
@@ -316,24 +345,22 @@ def main():
                     and (proc_idx - min_len) % feat_cfg.stride == 0
                     and proc_idx != last_infer_idx
                 ):
-                    best_tid = pick_best_track(track_histories, min_len)
-                    if best_tid is not None:
-                        skeleton = build_skeleton_tensor(
-                            list(track_histories[best_tid]),
-                            feat_cfg.seq_len,
-                            frame_shape,
-                        )
-                        skeleton = np.transpose(skeleton, (2, 0, 1)).astype(np.float32, copy=False)
-                        work_queue.put((window_counter, skeleton))
-                        window_counter += 1
-                        last_infer_idx = proc_idx
+                    skeleton = build_multi_skeleton_tensor(
+                        track_histories,
+                        feat_cfg.seq_len,
+                        frame_shape,
+                        max_persons=args.max_persons,
+                        min_len=min_len,
+                    )
+                    work_queue.put((window_counter, skeleton))
+                    window_counter += 1
+                    last_infer_idx = proc_idx
 
             with state_lock:
                 if result_state["window_id"] >= 0:
                     last_prob = result_state["prob"]
                     prob_text = f"Violence prob: {last_prob:.2f}"
 
-            # pace display to match source FPS
             now = time.perf_counter()
             if last_display is not None:
                 elapsed = now - last_display
@@ -351,7 +378,6 @@ def main():
             cv2.putText(frame, prob_text, (12, 32), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 2)
             cv2.putText(frame, fps_text, (12, 64), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-            # draw latest tracks (may lag a bit)
             for tid, bbox, keypoints in latest_tracks:
                 x1, y1, x2, y2 = bbox.astype(int)
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -360,7 +386,7 @@ def main():
                         cv2.circle(frame, (int(x), int(y)), 2, (255, 0, 0), -1)
                 cv2.putText(frame, f"ID {tid}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-            cv2.imshow("Async Violence Demo", frame)
+            cv2.imshow("Async Violence Demo (Multi-person)", frame)
             if out_writer is not None:
                 out_writer.write(frame)
 
