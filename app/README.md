@@ -6,10 +6,7 @@ Concise guide for running and using the FastAPI wrapper around the violence dete
 - Two models: ST-GCN (skeleton-based) and MoViNet (video-based).
 - Two modes: live monitoring (`/live`) and offline analysis (`/offline`).
 - Built with FastAPI, WebSockets, MJPEG streaming, and background tasks.
-
-## Quick start
-1) Ensure Python 3.10+. From `app/`, install dependencies:
-```
+`
 ## 🎯 Features
 
 ### Multiple Detection Models
