@@ -11,3 +11,4 @@ venv/
 app/venv/
 **/__pycache__/
 *.pyc
+main_code/precomputed_skeletons/
