@@ -1,0 +1,29 @@
+app
+├── DIRECTORY_STRUCTURE.txt
+├── IMPLEMENTATION_SUMMARY.md
+├── README.md
+├── SETUP_GUIDE.md
+├── api
+│   ├── __init__.py
+│   ├── live.py
+│   └── offline.py
+├── core
+│   ├── __init__.py
+│   ├── config.py
+│   └── model_manager.py
+├── main.py
+├── models
+│   ├── __init__.py
+│   ├── violence_a.py
+│   └── violence_b.py
+├── outputs
+├── requirements.txt
+├── run_example.py
+├── start.sh
+├── static
+├── templates
+│   ├── live.html
+│   └── offline.html
+└── uploads
+
+8 directories, 19 files

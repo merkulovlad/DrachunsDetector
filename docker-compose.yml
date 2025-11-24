@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: ./app/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+    command: ["./start.sh"]
+    environment:
+      # Model A
+      MODEL_A_CHECKPOINT: checkpoints/best_model.pth
+      MODEL_A_POSE_WEIGHTS: yolov8n-pose.pt
+      MODEL_A_DEVICE: cpu
+      MODEL_A_SEQ_LEN: "30"
+      MODEL_A_STRIDE: "15"
+      MODEL_A_THRESHOLD: "0.8"
+
+      # Model B
+      MODEL_B_CHECKPOINT: checkpoints/epoch009.pt
+      MODEL_B_DEVICE: cpu
+      MODEL_B_CLIP_LENGTH: "6"
+      MODEL_B_THRESHOLD: "0.47"
+      MODEL_B_CLASS_NAMES: '["no_violence", "violence"]'
+
+      # Server
+      HOST: 0.0.0.0
+      PORT: "8000"
+      DEBUG: "false"
+
+      # CORS
+      CORS_ORIGINS: "*"

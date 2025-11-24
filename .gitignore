@@ -1,15 +1,15 @@
 .DS_Store
-
+.env
+app/.env
 # Model checkpoints and weights
-*.ckpt
-*.pth
-checkpoint/
-checkpoints/
 stream_platform/MoViNet-pytorch/
 *.pt
 *.pth
 *.mp4
 # Python cache
 __pycache__/
-/docker-compose.yml
 stream_platform/Dockerfile
+venv/
+app/venv/
+**/__pycache__/
+*.pyc

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Monitor - Violence Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        select, button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        select {
+            background: white;
+            color: #333;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        #videoFeed {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .nav {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+        
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        
+        .method-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .method-btn {
+            flex: 1;
+            padding: 15px;
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .method-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .method-btn:hover {
+            border-color: #667eea;
+        }
+        
+        .method-content {
+            display: none;
+        }
+        
+        .method-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 Live Violence Monitor</h1>
+            <p>Real-time violence detection from camera or phone stream</p>
+        </div>
+        
+        <div class="content">
+            <div class="method-selector">
+                <button class="method-btn active" onclick="selectMethod('camera')">
+                    <h3>📹 Camera Stream</h3>
+                    <p>Use local webcam</p>
+                </button>
+                <button class="method-btn" onclick="selectMethod('browser')">
+                    <h3>📱 Browser Capture</h3>
+                    <p>Capture from device camera</p>
+                </button>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect" onchange="changeModel()">
+                        {% for model in available_models %}
+                        <option value="{{ model }}" {% if model == current_model %}selected{% endif %}>
+                            Model {{ model|upper }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="control-group method-content camera active">
+                    <button id="startBtn" onclick="startCamera()">Start Camera</button>
+                    <button id="stopBtn" onclick="stopCamera()" disabled>Stop Camera</button>
+                </div>
+                
+                <div class="control-group method-content browser">
+                    <button id="startBrowserBtn" onclick="startBrowserCapture()">Start Capture</button>
+                    <button id="stopBrowserBtn" onclick="stopBrowserCapture()" disabled>Stop Capture</button>
+                </div>
+            </div>
+            
+            <div id="status" class="status info">
+                <div class="status-indicator"></div>
+                <span id="statusText">Ready to start</span>
+            </div>
+            
+            <div class="video-container">
+                <img id="videoFeed" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='white' font-size='24' font-family='Arial'%3ENo stream active%3C/text%3E%3C/svg%3E" alt="Video feed">
+                <canvas id="canvas" style="display: none;"></canvas>
+                <video id="video" style="display: none;" autoplay playsinline></video>
+            </div>
+        </div>
+        
+        <div class="nav">
+            <a href="/offline">→ Go to Offline Analyzer</a>
+        </div>
+    </div>
+    
+    <script>
+        let currentMethod = 'camera';
+        let currentModel = '{{ current_model }}';
+        let ws = null;
+        let mediaStream = null;
+        let captureInterval = null;
+        
+        function selectMethod(method) {
+            currentMethod = method;
+            
+            // Update button styles
+            document.querySelectorAll('.method-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.method-btn').classList.add('active');
+            
+            // Update controls visibility
+            document.querySelectorAll('.method-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll(`.method-content.${method}`).forEach(content => {
+                content.classList.add('active');
+            });
+            
+            // Stop any active streams
+            if (currentMethod === 'camera') {
+                stopBrowserCapture();
+            } else {
+                stopCamera();
+            }
+        }
+        
+        function changeModel() {
+            const select = document.getElementById('modelSelect');
+            const newModel = select.value;
+            
+            fetch('/api/model/select', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({model: newModel})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    updateStatus('Error switching model: ' + data.error, 'error');
+                    return;
+                }
+                currentModel = newModel;
+                updateStatus(`Switched to Model ${currentModel.toUpperCase()}`, 'success');
+                
+                // If using MJPEG camera, reload image src to use new model
+                const img = document.getElementById('videoFeed');
+                if (!ws && document.getElementById('startBtn').disabled) {
+                    // Camera appears active (startBtn disabled)
+                    img.src = `/api/live/camera/stream?model=${currentModel}&t=${Date.now()}`;
+                }
+                
+                // If using WebSocket browser capture, reconnect
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    // Close and re-open the websocket with the new model parameter
+                    stopBrowserCapture();
+                    // Automatically restart with new model
+                    setTimeout(() => startBrowserCapture(), 100);
+                }
+            })
+            .catch(err => {
+                updateStatus('Error switching model', 'error');
+            });
+        }
+        
+        function startCamera() {
+            updateStatus('Starting camera...', 'info');
+            
+            fetch('/api/live/camera/start')
+                .then(r => r.json())
+                .then(data => {
+                    // Start MJPEG stream
+                    const img = document.getElementById('videoFeed');
+                    img.src = `/api/live/camera/stream?model=${currentModel}&t=${Date.now()}`;
+                    
+                    updateStatus('Camera active', 'success');
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                })
+                .catch(err => {
+                    updateStatus('Error starting camera: ' + err, 'error');
+                });
+        }
+        
+        function stopCamera() {
+            fetch('/api/live/camera/stop')
+                .then(r => r.json())
+                .then(data => {
+                    const img = document.getElementById('videoFeed');
+                    img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='white' font-size='24' font-family='Arial'%3ENo stream active%3C/text%3E%3C/svg%3E";
+                    
+                    updateStatus('Camera stopped', 'info');
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                })
+                .catch(err => {
+                    updateStatus('Error stopping camera: ' + err, 'error');
+                });
+        }
+        
+        async function startBrowserCapture() {
+            try {
+                updateStatus('Requesting camera access...', 'info');
+                
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
+                const img = document.getElementById('videoFeed');
+                
+                video.srcObject = mediaStream;
+                
+                // Wait for video to be ready
+                await new Promise(resolve => {
+                    video.onloadedmetadata = resolve;
+                });
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Connect WebSocket
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/api/live/stream?model=${currentModel}`;
+                ws = new WebSocket(wsUrl);
+                ws.binaryType = 'arraybuffer';
+                
+                ws.onopen = () => {
+                    updateStatus('Connected - streaming...', 'success');
+                    
+                    // Start sending frames
+                    captureInterval = setInterval(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(video, 0, 0);
+                            canvas.toBlob(blob => {
+                                if (blob) {
+                                    blob.arrayBuffer().then(buffer => {
+                                        ws.send(buffer);
+                                    });
+                                }
+                            }, 'image/jpeg', 0.8);
+                        }
+                    }, 100); // ~10 FPS
+                };
+                
+                ws.onmessage = (event) => {
+                    const blob = new Blob([event.data], {type: 'image/jpeg'});
+                    img.src = URL.createObjectURL(blob);
+                };
+                
+                ws.onerror = (error) => {
+                    updateStatus('WebSocket error', 'error');
+                    console.error('WebSocket error:', error);
+                };
+                
+                ws.onclose = () => {
+                    updateStatus('Connection closed', 'info');
+                };
+                
+                document.getElementById('startBrowserBtn').disabled = true;
+                document.getElementById('stopBrowserBtn').disabled = false;
+                
+            } catch (err) {
+                updateStatus('Error: ' + err.message, 'error');
+                console.error('Error:', err);
+            }
+        }
+        
+        function stopBrowserCapture() {
+            if (captureInterval) {
+                clearInterval(captureInterval);
+                captureInterval = null;
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            
+            const img = document.getElementById('videoFeed');
+            img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='white' font-size='24' font-family='Arial'%3ENo stream active%3C/text%3E%3C/svg%3E";
+            
+            updateStatus('Capture stopped', 'info');
+            document.getElementById('startBrowserBtn').disabled = false;
+            document.getElementById('stopBrowserBtn').disabled = true;
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+            
+            statusText.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopCamera();
+            stopBrowserCapture();
+        });
+    </script>
+</body>
+</html>
