@@ -3,8 +3,6 @@
 app/.env
 # Model checkpoints and weights
 stream_platform/MoViNet-pytorch/
-*.pt
-*.pth
 *.mp4
 # Python cache
 __pycache__/
