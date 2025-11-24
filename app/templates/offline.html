@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Analyzer - Violence Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .upload-section {
+            border: 3px dashed #ddd;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+        }
+        
+        .upload-section.dragover {
+            border-color: #f5576c;
+            background: #fff5f7;
+        }
+        
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .upload-section h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .upload-section p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn-upload {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        select, button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: 2px solid #f5576c;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        select {
+            background: white;
+            color: #333;
+        }
+        
+        button {
+            background: #f5576c;
+            color: white;
+            font-weight: 600;
+            border: none;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #e04559;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .selected-file {
+            display: none;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .selected-file.active {
+            display: block;
+        }
+        
+        .selected-file strong {
+            color: #f5576c;
+        }
+        
+        .progress-section {
+            display: none;
+            margin: 30px 0;
+        }
+        
+        .progress-section.active {
+            display: block;
+        }
+        
+        .progress-bar {
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .results-section {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .results-section.active {
+            display: block;
+        }
+        
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .result-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-label {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .result-value {
+            color: #333;
+        }
+        
+        .violence-alert {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .no-violence {
+            background: #e8f5e9;
+            color: #388e3c;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .video-preview {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            display: block;
+            border-radius: 8px;
+        }
+        
+        .nav {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .nav a {
+            color: #f5576c;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+        
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        
+        .detection-timeline {
+            margin-top: 20px;
+        }
+        
+        .detection-item {
+            background: white;
+            padding: 10px 15px;
+            border-left: 4px solid #f5576c;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        
+        .detection-time {
+            font-weight: 600;
+            color: #f5576c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📹 Offline Video Analyzer</h1>
+            <p>Upload and analyze pre-recorded videos for violence detection</p>
+        </div>
+        
+        <div class="content">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📁</div>
+                <h2>Upload Video File</h2>
+                <p>Select a video file to analyze with violence detection</p>
+                
+                <div class="file-input-wrapper">
+                    <label for="fileInput" class="btn-upload">
+                        Choose Video File
+                    </label>
+                    <input type="file" id="fileInput" accept="video/*" onchange="handleFileSelect(event)">
+                </div>
+            </div>
+            
+            <div class="selected-file" id="selectedFile">
+                <strong>Selected file:</strong> <span id="fileName"></span>
+                <span id="fileSize"></span>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect">
+                        {% for model in available_models %}
+                        <option value="{{ model }}">Model {{ model|upper }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button id="analyzeBtn" onclick="startAnalysis()" disabled>
+                    Start Analysis
+                </button>
+                
+                <button id="cancelBtn" onclick="cancelAnalysis()" disabled>
+                    Cancel
+                </button>
+            </div>
+            
+            <div class="progress-section" id="progressSection">
+                <h3>Processing Video...</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">0%</div>
+                </div>
+                <div class="progress-info">
+                    <span id="progressText">Starting...</span>
+                    <span id="framesText">0 / 0 frames</span>
+                </div>
+            </div>
+            
+            <div class="results-section" id="resultsSection">
+                <h2>Analysis Results</h2>
+                
+                <div id="alertBox"></div>
+                
+                <div class="result-card">
+                    <h3>Video Information</h3>
+                    <div class="result-item">
+                        <span class="result-label">File:</span>
+                        <span class="result-value" id="resFileName"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Model Used:</span>
+                        <span class="result-value" id="resModel"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Total Frames:</span>
+                        <span class="result-value" id="resTotalFrames"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">FPS:</span>
+                        <span class="result-value" id="resFps"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Processing Time:</span>
+                        <span class="result-value" id="resTime"></span>
+                    </div>
+                </div>
+                
+                <div class="result-card" id="detectionsCard" style="display: none;">
+                    <h3>Violence Detections</h3>
+                    <p>Total detections: <strong id="detectionCount">0</strong></p>
+                    <div class="detection-timeline" id="detectionTimeline"></div>
+                </div>
+                
+                <div class="result-card">
+                    <h3>Download Processed Video</h3>
+                    <button onclick="downloadVideo()" class="btn-upload">
+                        ⬇️ Download Video
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="nav">
+            <a href="/live">← Go to Live Monitor</a>
+        </div>
+    </div>
+    
+    <script>
+        let selectedFile = null;
+        let currentJobId = null;
+        let pollInterval = null;
+        
+        function handleFileSelect(event) {
+            selectedFile = event.target.files[0];
+            
+            if (selectedFile) {
+                document.getElementById('fileName').textContent = selectedFile.name;
+                document.getElementById('fileSize').textContent = 
+                    `(${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`;
+                document.getElementById('selectedFile').classList.add('active');
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+        
+        // Drag and drop
+        const uploadSection = document.getElementById('uploadSection');
+        
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+        
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('video/')) {
+                selectedFile = files[0];
+                document.getElementById('fileName').textContent = selectedFile.name;
+                document.getElementById('fileSize').textContent = 
+                    `(${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`;
+                document.getElementById('selectedFile').classList.add('active');
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        });
+        
+        async function startAnalysis() {
+            if (!selectedFile) return;
+            
+            const modelSelect = document.getElementById('modelSelect');
+            const model = modelSelect.value;
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            // Show progress
+            document.getElementById('progressSection').classList.add('active');
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('analyzeBtn').disabled = true;
+            document.getElementById('cancelBtn').disabled = false;
+            
+            try {
+                // Upload and start processing
+                const response = await fetch(`/api/offline/upload?model=${model}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.job_id) {
+                    currentJobId = data.job_id;
+                    pollJobStatus();
+                } else {
+                    alert('Error starting analysis: ' + (data.error || 'Unknown error'));
+                    resetUI();
+                }
+            } catch (error) {
+                alert('Error uploading file: ' + error.message);
+                resetUI();
+            }
+        }
+        
+        function pollJobStatus() {
+            if (!currentJobId) return;
+            
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/offline/status/${currentJobId}`);
+                    const data = await response.json();
+                    
+                    updateProgress(data);
+                    
+                    if (data.status === 'completed') {
+                        clearInterval(pollInterval);
+                        await loadResults();
+                    } else if (data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        alert('Analysis failed: ' + (data.error || 'Unknown error'));
+                        resetUI();
+                    }
+                } catch (error) {
+                    console.error('Error polling status:', error);
+                }
+            }, 1000); // Poll every second
+        }
+        
+        function updateProgress(data) {
+            const progress = data.progress || 0;
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const framesText = document.getElementById('framesText');
+            
+            progressFill.style.width = progress + '%';
+            progressFill.textContent = Math.round(progress) + '%';
+            progressText.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+            framesText.textContent = `${data.processed_frames || 0} / ${data.total_frames || 0} frames`;
+        }
+        
+        async function loadResults() {
+            try {
+                const response = await fetch(`/api/offline/result/${currentJobId}`);
+                const data = await response.json();
+                
+                // Show results section
+                document.getElementById('progressSection').classList.remove('active');
+                document.getElementById('resultsSection').classList.add('active');
+                
+                // Fill in results
+                document.getElementById('resFileName').textContent = data.filename;
+                document.getElementById('resModel').textContent = `Model ${data.model.toUpperCase()}`;
+                document.getElementById('resTotalFrames').textContent = data.total_frames;
+                document.getElementById('resFps').textContent = data.fps.toFixed(2);
+                
+                // Calculate processing time
+                const created = new Date(data.created_at);
+                const completed = new Date(data.completed_at);
+                const duration = ((completed - created) / 1000).toFixed(1);
+                document.getElementById('resTime').textContent = `${duration}s`;
+                
+                // Alert box
+                const alertBox = document.getElementById('alertBox');
+                if (data.violence_detected) {
+                    alertBox.innerHTML = `<div class="violence-alert">⚠️ Violence detected in ${data.violence_detections.length} instances</div>`;
+                    
+                    // Show detections
+                    document.getElementById('detectionsCard').style.display = 'block';
+                    document.getElementById('detectionCount').textContent = data.violence_detections.length;
+                    
+                    const timeline = document.getElementById('detectionTimeline');
+                    timeline.innerHTML = '';
+                    
+                    data.violence_detections.forEach(detection => {
+                        const item = document.createElement('div');
+                        item.className = 'detection-item';
+                        item.innerHTML = `
+                            <span class="detection-time">@ ${detection.timestamp.toFixed(2)}s</span>
+                            (Frame ${detection.frame}) - Probability: ${(detection.probability * 100).toFixed(1)}%
+                        `;
+                        timeline.appendChild(item);
+                    });
+                } else {
+                    alertBox.innerHTML = '<div class="no-violence">✅ No violence detected in this video</div>';
+                    document.getElementById('detectionsCard').style.display = 'none';
+                }
+                
+                document.getElementById('cancelBtn').disabled = true;
+                
+            } catch (error) {
+                alert('Error loading results: ' + error.message);
+            }
+        }
+        
+        function downloadVideo() {
+            if (currentJobId) {
+                window.location.href = `/api/offline/download/${currentJobId}`;
+            }
+        }
+        
+        function cancelAnalysis() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+            resetUI();
+        }
+        
+        function resetUI() {
+            document.getElementById('progressSection').classList.remove('active');
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('analyzeBtn').disabled = false;
+            document.getElementById('cancelBtn').disabled = true;
+            currentJobId = null;
+        }
+    </script>
+</body>
+</html>
