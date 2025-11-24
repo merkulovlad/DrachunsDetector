@@ -9,11 +9,12 @@ from contextlib import asynccontextmanager
 import logging
 
 # Add project paths
+sys.path.insert(0, str(Path(__file__).parent))  # allow `core`/`models` when running from repo root
 sys.path.insert(0, str(Path(__file__).parent.parent / "main_code"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "stream_platform"))
 
 from core.config import settings
-from core.model_manager import model_manager
+from core.model_manager import model_manager, CHECKPOINT_FIELDS
 from api import live, offline
 
 # Configure logging
@@ -112,8 +113,14 @@ async def offline_page(request: Request):
 async def select_model(payload: dict):
     """Select active model. Accepts JSON body: {"model": "a"}"""
     model = payload.get("model") if isinstance(payload, dict) else None
-    if model not in ["a", "b"]:
-        return {"error": "Invalid model. Use 'a' or 'b'", "status": "error"}
+    available = model_manager.list_available_models()
+    if not available:
+        return {"error": "No models initialized", "status": "error"}
+    if model not in available:
+        return {
+            "error": f"Invalid model. Choose one of {', '.join(m.upper() for m in available)}",
+            "status": "error",
+        }
 
     try:
         model_manager.set_current_model(model)
@@ -133,14 +140,18 @@ async def load_model(payload: dict):
     """
     model = payload.get("model") if isinstance(payload, dict) else None
     checkpoint = payload.get("checkpoint") if isinstance(payload, dict) else None
-    if model not in ["a", "b"]:
-        return {"error": "Invalid model. Use 'a' or 'b'"}
+    field_name = CHECKPOINT_FIELDS.get(model)
+    if field_name is None:
+        return {"error": "Invalid model key"}
+
+    if checkpoint:
+        path_obj = Path(checkpoint)
+        if not path_obj.exists():
+            return {"error": f"Checkpoint not found: {checkpoint}"}
+        setattr(settings, field_name, str(path_obj.resolve()))
 
     try:
-        if model == "a":
-            model_manager.initialize_models(model_a_checkpoint=checkpoint or settings.model_a_checkpoint)
-        else:
-            model_manager.initialize_models(model_b_checkpoint=checkpoint or settings.model_b_checkpoint)
+        model_manager.initialize_models(**{field_name: getattr(settings, field_name)})
 
         available = model_manager.list_available_models()
         return {"status": "ok", "available": available}

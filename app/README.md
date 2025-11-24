@@ -1,12 +1,15 @@
 # FastAPI Violence Detection System
 
-A comprehensive web-based violence detection system with two different deep learning models, offering both real-time streaming and offline video analysis capabilities.
+A comprehensive web-based violence detection system with multiple deep learning models (skeleton-, CNN-, and transformer-based), offering both real-time streaming and offline video analysis capabilities.
 
 ## 🎯 Features
 
-### Two Detection Models
+### Multiple Detection Models
 - **Model A (ST-GCN)**: Skeleton-based violence detection using Spatial-Temporal Graph Convolutional Networks with YOLO pose estimation
 - **Model B (MoViNet)**: Video-based violence detection using Mobile Video Networks (streaming variant)
+- **Model C (R2P1 / R(2+1)D-18)**: Clip-based ResNet-style video encoder trained on violence clips
+- **Model D (ViViT)**: Transformer-based video classifier loaded from Hugging Face weights
+- **Model E (VideoMAE)**: Transformer-based masked autoencoder fine-tuned for violence detection
 
 ### Two Analysis Modes
 1. **Live Monitor** (`/live`): Real-time violence detection from webcam or phone camera
@@ -33,7 +36,10 @@ app/
 │   └── offline.py         # Offline processing endpoints
 ├── models/                 # Model wrapper classes
 │   ├── violence_a.py      # Model A (ST-GCN) wrapper
-│   └── violence_b.py      # Model B (MoViNet) wrapper
+│   ├── violence_b.py      # Model B (MoViNet) wrapper
+│   ├── violence_r2p1.py   # Model C (R2P1) wrapper
+│   ├── violence_transformers.py  # Model D/E (ViViT/VideoMAE) wrappers
+│   └── video_utils.py     # Shared video helpers
 ├── core/                   # Core utilities
 │   ├── config.py          # Configuration settings
 │   └── model_manager.py   # Model instance management
@@ -53,6 +59,9 @@ app/
 - Pre-trained model checkpoints:
   - Model A: ST-GCN checkpoint file (`.pt`)
   - Model B: MoViNet checkpoint file (`.pt`)
+  - Model C: R2P1 checkpoint file (`.pt`)
+  - Model D: ViViT model directory (config + safetensors)
+  - Model E: VideoMAE model directory (config + safetensors)
 
 ## 🚀 Installation
 
@@ -76,7 +85,7 @@ cd app
 pip install -r requirements.txt
 ```
 
-**Note**: This will install both Model A and Model B dependencies. The MoViNet library will be installed from GitHub.
+**Note**: This installs all detector dependencies (ST-GCN, MoViNet, R2P1, ViViT, and VideoMAE). The MoViNet library is installed directly from GitHub alongside Hugging Face's `transformers`.
 
 ### 4. Download or Place Model Checkpoints
 
@@ -102,6 +111,26 @@ MODEL_A_THRESHOLD=0.8
 MODEL_B_CHECKPOINT=/path/to/movinet_checkpoint.pt
 MODEL_B_DEVICE=cpu  # or cuda
 MODEL_B_THRESHOLD=0.47
+
+# Model C (R2P1) settings
+MODEL_C_CHECKPOINT=./r2p1_vivit_mae/r2p1/best_r2p1d18.pt
+MODEL_C_DEVICE=cpu
+MODEL_C_CLIP_LENGTH=16
+MODEL_C_THRESHOLD=0.5
+
+# Model D (ViViT) settings
+MODEL_D_CHECKPOINT=./r2p1_vivit_mae/vivit/best_model
+MODEL_D_DEVICE=cpu
+MODEL_D_CLIP_LENGTH=32
+MODEL_D_THRESHOLD=0.5
+MODEL_D_POSITIVE_LABEL=Fight
+
+# Model E (VideoMAE) settings
+MODEL_E_CHECKPOINT=./r2p1_vivit_mae/mae/best_model
+MODEL_E_DEVICE=cpu
+MODEL_E_CLIP_LENGTH=16
+MODEL_E_THRESHOLD=0.5
+MODEL_E_POSITIVE_LABEL=Fight
 
 # Server settings
 HOST=0.0.0.0

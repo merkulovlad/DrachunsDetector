@@ -37,6 +37,26 @@ class Settings(BaseSettings):
     model_b_clip_length: int = 6
     model_b_threshold: float = 0.47
     model_b_class_names: List[str] = ["no_violence", "violence"]
+
+    # Model C settings (R(2+1)D)
+    model_c_checkpoint: str = str(base_dir / "r2p1_vivit_mae" / "r2p1" / "best_r2p1d18.pt")
+    model_c_device: str = "cpu"
+    model_c_clip_length: int = 16
+    model_c_threshold: float = 0.5
+
+    # Model D settings (ViViT)
+    model_d_checkpoint: str = str(base_dir / "r2p1_vivit_mae" / "vivit" / "best_model")
+    model_d_device: str = "cpu"
+    model_d_clip_length: int = 32
+    model_d_threshold: float = 0.5
+    model_d_positive_label: str = "Fight"
+
+    # Model E settings (VideoMAE)
+    model_e_checkpoint: str = str(base_dir / "r2p1_vivit_mae" / "mae" / "best_model")
+    model_e_device: str = "cpu"
+    model_e_clip_length: int = 16
+    model_e_threshold: float = 0.5
+    model_e_positive_label: str = "Fight"
     
     # Server settings
     host: str = "0.0.0.0"

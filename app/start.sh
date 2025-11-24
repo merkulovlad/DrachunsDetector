@@ -1,55 +1,47 @@
-#!/bin/bash
-# Quick start script for FastAPI Violence Detection System
+#!/usr/bin/env bash
 
-echo "🚀 Starting Violence Detection System..."
-echo ""
+# Unified start script for local development and container runs.
+# Creates an optional virtual environment (skip with SKIP_VENV=1),
+# installs dependencies once, and then launches the FastAPI app.
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "📦 Creating virtual environment..."
-    python3 -m venv venv
-fi
+set -euo pipefail
 
-# Activate virtual environment
-echo "✅ Activating virtual environment..."
-source venv/bin/activate
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-# Install dependencies if needed
-if [ ! -f "venv/.dependencies_installed" ]; then
-    echo "📥 Installing dependencies..."
-    pip install -r requirements.txt
-    touch venv/.dependencies_installed
-    echo "✅ Dependencies installed"
+INFO_PREFIX="[start]"
+
+echo "${INFO_PREFIX} Violence Detection System"
+
+if [[ "${SKIP_VENV:-0}" != "1" ]]; then
+    if [[ ! -d ".venv" ]]; then
+        echo "${INFO_PREFIX} Creating virtual environment (.venv)"
+        python3 -m venv .venv
+    fi
+
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+
+    if [[ ! -f ".venv/.deps_installed" ]]; then
+        echo "${INFO_PREFIX} Installing Python dependencies"
+        pip install --no-cache-dir -r requirements.txt
+        touch .venv/.deps_installed
+        echo "${INFO_PREFIX} Dependencies installed"
+    else
+        echo "${INFO_PREFIX} Dependencies already installed"
+    fi
 else
-    echo "✅ Dependencies already installed"
+    echo "${INFO_PREFIX} SKIP_VENV=1 -> using system Python"
 fi
 
-echo ""
-echo "🎯 Configuration:"
-echo "   You need to set model checkpoint paths before starting."
-echo "   Options:"
-echo "   1. Copy .env.example to .env and edit it"
-echo "   2. Set environment variables manually"
-echo "   3. Edit core/config.py directly"
-echo ""
-
-# Check if .env exists
-if [ -f ".env" ]; then
-    echo "✅ Found .env file"
+if [[ -f ".env" ]]; then
+    echo "${INFO_PREFIX} Using .env configuration"
 else
-    echo "⚠️  No .env file found. You can:"
-    echo "   cp .env.example .env"
-    echo "   Then edit .env with your checkpoint paths"
-    echo ""
+    echo "${INFO_PREFIX} .env not found (copy .env.example and set checkpoints)"
 fi
 
-echo "🌐 Starting FastAPI server..."
-echo "   Live Monitor: http://localhost:8000/live"
-echo "   Offline Analyzer: http://localhost:8000/offline"
-echo "   API Docs: http://localhost:8000/docs"
-echo ""
-echo "Press Ctrl+C to stop"
-echo ""
+HOST_VALUE=${HOST:-0.0.0.0}
+PORT_VALUE=${PORT:-8000}
 
-# Start the server
-python main.py
+echo "${INFO_PREFIX} Starting FastAPI server on ${HOST_VALUE}:${PORT_VALUE}"
+exec python main.py

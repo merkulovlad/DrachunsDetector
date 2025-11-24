@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional
 import logging
 
-from core.model_manager import model_manager, ModelType
+from core.model_manager import model_manager, ModelType, CHECKPOINT_FIELDS
 from core.config import settings
 
 router = APIRouter(prefix="/api/live", tags=["live"])
@@ -16,6 +16,44 @@ logger = logging.getLogger(__name__)
 # Active camera stream
 active_camera = None
 camera_lock = asyncio.Lock()
+
+
+def _resolve_model_key(requested: Optional[str]) -> Optional[ModelType]:
+    available = model_manager.list_available_models()
+    if not available:
+        return None
+    if requested in available:
+        return requested  # type: ignore
+    current = model_manager.get_current_model_type()
+    if current in available:
+        return current
+    return available[0]
+
+
+def _prepare_detector(model_type: Optional[ModelType]):
+    if model_type is None:
+        return None, False
+    try:
+        detector = model_manager.get_model(model_type)
+        detector.reset()
+        return detector, True
+    except Exception as exc:
+        logger.info(f"Model {model_type} not initialized yet: {exc}")
+
+    field_name = CHECKPOINT_FIELDS.get(model_type)
+    checkpoint = getattr(settings, field_name, "") if field_name else ""
+    if not checkpoint:
+        return None, False
+
+    try:
+        model_manager.initialize_models(**{field_name: checkpoint})
+        detector = model_manager.get_model(model_type)
+        detector.reset()
+        logger.info(f"Auto-loaded model {model_type} from {checkpoint}")
+        return detector, True
+    except Exception as exc:
+        logger.warning(f"Failed to auto-load model {model_type}: {exc}")
+        return None, False
 
 
 class CameraStream:
@@ -53,7 +91,7 @@ class CameraStream:
 @router.websocket("/stream")
 async def websocket_stream(
     websocket: WebSocket,
-    model: Optional[str] = Query("a", description="Model to use (a or b)")
+    model: Optional[str] = Query(None, description="Model key to use (a, b, c, ...)")
 ):
     """
     WebSocket endpoint for real-time video streaming.
@@ -62,34 +100,13 @@ async def websocket_stream(
     """
     await websocket.accept()
     
-    # Validate model selection
-    model_type = model if model in ["a", "b"] else "a"
-
-    # Try to get detector; if not initialized, attempt to auto-load from config, otherwise passthrough
-    try:
-        detector = model_manager.get_model(model_type)
-        detector.reset()
-        model_ready = True
-        logger.info(f"WebSocket stream started with model {model_type}")
-    except Exception as e:
-        logger.info(f"Model {model_type} not initialized, attempting auto-load from settings: {e}")
-        detector = None
-        model_ready = False
-        # Try to auto-initialize from config checkpoint paths if available
-        try:
-            if model_type == "a" and settings.model_a_checkpoint:
-                model_manager.initialize_models(model_a_checkpoint=settings.model_a_checkpoint)
-            if model_type == "b" and settings.model_b_checkpoint:
-                model_manager.initialize_models(model_b_checkpoint=settings.model_b_checkpoint)
-            # Try to get model again
-            detector = model_manager.get_model(model_type)
-            detector.reset()
-            model_ready = True
-            logger.info(f"Auto-loaded model {model_type} from settings")
-        except Exception as e2:
-            logger.warning(f"Auto-load failed for model {model_type}: {e2}")
-            detector = None
-            model_ready = False
+    model_type = _resolve_model_key(model)
+    detector, model_ready = _prepare_detector(model_type)
+    model_label = model_type or "none"
+    if model_ready:
+        logger.info(f"WebSocket stream started with model {model_label}")
+    else:
+        logger.warning("WebSocket stream running without an initialized model")
 
     try:
         while True:
@@ -115,14 +132,14 @@ async def websocket_stream(
             else:
                 # Passthrough: echo original frame with a small overlay indicating no model
                 annotated = frame.copy()
-                cv2.putText(annotated, f"NO MODEL ({model_type})", (12, 32), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2)
+                cv2.putText(annotated, f"NO MODEL ({model_label})", (12, 32), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255), 2)
 
             # Encode and send back
             _, buffer = cv2.imencode('.jpg', annotated)
             await websocket.send_bytes(buffer.tobytes())
 
     except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected for model {model_type}")
+        logger.info(f"WebSocket disconnected for model {model_label}")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         try:
@@ -160,7 +177,7 @@ async def stop_camera():
 
 
 @router.get("/camera/stream")
-async def camera_stream(model: str = Query("a", description="Model to use (a or b)")):
+async def camera_stream(model: Optional[str] = Query(None, description="Model key to use (a, b, c, ...)")):
     """
     MJPEG stream endpoint for camera feed.
     
@@ -168,13 +185,11 @@ async def camera_stream(model: str = Query("a", description="Model to use (a or 
     """
     global active_camera
     
-    # Validate model
-    model_type = model if model in ["a", "b"] else "a"
-    
-    try:
-        detector = model_manager.get_model(model_type)
-        detector.reset()
-    except ValueError:
+    model_type = _resolve_model_key(model)
+    detector, ready = _prepare_detector(model_type)
+    if model_type is None:
+        return {"error": "No models available"}
+    if not ready or detector is None:
         return {"error": f"Model {model_type} not available"}
     
     async def generate():

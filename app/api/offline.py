@@ -18,6 +18,18 @@ logger = logging.getLogger(__name__)
 jobs: Dict[str, dict] = {}
 
 
+def _resolve_model_choice(requested: Optional[str]) -> Optional[ModelType]:
+    available = model_manager.list_available_models()
+    if not available:
+        return None
+    if requested in available:
+        return requested  # type: ignore
+    current = model_manager.get_current_model_type()
+    if current in available:
+        return current
+    return available[0]
+
+
 def process_video_job(
     job_id: str,
     input_path: Path,
@@ -114,7 +126,7 @@ def process_video_job(
 async def upload_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    model: str = Query("a", description="Model to use (a or b)")
+    model: Optional[str] = Query(None, description="Model key to use (a, b, c, ...)")
 ):
     """
     Upload a video file for offline processing.
@@ -122,7 +134,9 @@ async def upload_video(
     Returns a job ID for tracking progress.
     """
     # Validate model
-    model_type = model if model in ["a", "b"] else "a"
+    model_type = _resolve_model_choice(model)
+    if model_type is None:
+        raise HTTPException(status_code=400, detail="No models available")
     
     if model_type not in model_manager.list_available_models():
         raise HTTPException(status_code=400, detail=f"Model {model_type} not available")

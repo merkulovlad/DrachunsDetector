@@ -19,6 +19,7 @@ stream_path = Path(__file__).parent.parent.parent / "stream_platform"
 sys.path.insert(0, str(stream_path))
 
 from backend.models.load_model import build_movinet_a0_stream
+from models.video_utils import prepare_clip_tensor
 
 
 def preprocess_frame(bgr: np.ndarray) -> torch.Tensor:
@@ -36,40 +37,6 @@ def preprocess_frame(bgr: np.ndarray) -> torch.Tensor:
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
     x = frame_tf(rgb) / 255.0
     return x
-
-
-def prepare_clip_tensor(clip):
-    """
-    Ensure the input clip matches MoViNet expected shape: (B, C, T, H, W).
-    Accepts a tensor or an iterable of frame tensors (C, H, W).
-    """
-    if isinstance(clip, torch.Tensor):
-        clip_tensor = clip
-    else:
-        clip_tensor = torch.stack(list(clip), dim=0)  # T, C, H, W
-
-    if clip_tensor.ndim == 4:
-        if clip_tensor.shape[0] in (1, 3):
-            pass
-        elif clip_tensor.shape[1] in (1, 3):
-            clip_tensor = clip_tensor.permute(1, 0, 2, 3)
-        elif clip_tensor.shape[-1] in (1, 3):
-            clip_tensor = clip_tensor.permute(-1, 0, 1, 2)
-        else:
-            raise ValueError(f"Cannot infer channel dimension for clip shape {clip_tensor.shape}")
-        if clip_tensor.ndim == 4:
-            clip_tensor = clip_tensor.unsqueeze(0)
-    elif clip_tensor.ndim == 5:
-        if clip_tensor.shape[1] not in (1, 3):
-            channel_axis = next((i for i, s in enumerate(clip_tensor.shape) if s in (1, 3)), None)
-            if channel_axis is None:
-                raise ValueError(f"Cannot infer channel dimension for clip shape {clip_tensor.shape}")
-            perm = [0, channel_axis] + [i for i in range(1, clip_tensor.ndim) if i != channel_axis]
-            clip_tensor = clip_tensor.permute(*perm)
-    else:
-        raise ValueError(f"Unsupported clip shape {clip_tensor.shape}")
-
-    return clip_tensor.contiguous()
 
 
 class ViolenceDetectorModelB:

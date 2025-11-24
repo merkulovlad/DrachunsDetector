@@ -24,6 +24,10 @@ matplotlib>=3.8.0
 einops==0.8.1
 MoViNet-pytorch @ git+https://github.com/Atze00/MoViNet-pytorch.git@c2d1edf48fc6c5259707f9d833f22171b4f63493
 
+# Transformer-based video models (ViViT / VideoMAE)
+transformers==4.44.2
+safetensors==0.4.5
+
 # Websockets
 websockets==12.0
 
