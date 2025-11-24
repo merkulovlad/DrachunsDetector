@@ -27,6 +27,7 @@ By automatically identifying violent behavior, the system aims to:
 
 - **Docker** (latest stable version)
 - **Docker Compose** (if not included in your Docker installation)
+- **Python 3.10** or higher installed
 
  Check versions:
 
@@ -45,3 +46,18 @@ cd DrachunsDetector
 ```bash
 docker compose up --build
 ```
+
+## FastAPI service
+ Open `http://localhost:8000/live` for the live monitor or `http://localhost:8000/offline` for uploads. Interactive docs: `http://localhost:8000/docs`.
+
+Key routes (see `app/api/`):
+- Live: `/api/live/stream` (WebSocket), `/api/live/camera/stream` (MJPEG)
+- Offline: `/api/offline/upload`, `/api/offline/status/{job_id}`, `/api/offline/result/{job_id}`
+- Model control: `/api/model/select`, `/api/model/current`
+
+Models to choose:
+- Model A: SCT-GCN
+- Model B: Movinet
+- Model C: r2p1d18
+- Model D: ViVit
+- Model E: VideoMAE
