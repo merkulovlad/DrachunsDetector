@@ -15,9 +15,9 @@ COPY main_code ./main_code
 
 COPY app/requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
-
+RUN chmod +x ./app/start.sh
 
 
 WORKDIR /project/app

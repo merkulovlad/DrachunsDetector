@@ -11,3 +11,7 @@ venv/
 app/venv/
 **/__pycache__/
 *.pyc
+
+*.pt
+*.safetensors
+.venv
