@@ -42,7 +42,7 @@ We apply **YOLOv8-Pose** to every frame, extracting for each visible person:
 
 This stage provides the raw geometric data that becomes the graph input.
 
-![COCO joints](../ST-GCN/images/image.png)
+![COCO joints](assets/image.png)
 ---
 
 ## **2.2 Tracking as Graph Continuity**
@@ -75,7 +75,7 @@ These windows are labeled violent/non-violent to train the ST-GCN.
 
 When multiple people appear together, we combine their graphs using a **block-diagonal adjacency matrix** and add sparse **inter-person links** (hip-to-hip or shoulder-to-shoulder) to model physical interaction.
 
-![alt text](../ST-GCN/images/image-1.png)
+![alt text](assets/image-1.png)
 ---
 
 # **3. Knowledge Representation as Graphs**
@@ -144,6 +144,7 @@ Graph convolutions allow the model to propagate information both **spatially** (
 # **5. Results**
 
 ### **Validation Metrics**
+
 | Metric | Score |
 |--------|-------|
 | **Accuracy** | 0.7286 |
