@@ -4,6 +4,7 @@ app/.env
 # Model checkpoints and weights
 stream_platform/MoViNet-pytorch/
 *.mp4
+*.avi
 # Python cache
 __pycache__/
 stream_platform/Dockerfile
