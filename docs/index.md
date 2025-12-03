@@ -8,6 +8,8 @@ title: Violence Recognition From Human Pose Graphs
 
 ---
 
+**The whole code with results you can find on our kaggle notebook** https://www.kaggle.com/code/hubanoid/violence-detection-main 
+
 ## **Abstract**
 This project presents a real-time violence detection system built entirely on **graph representations of human pose**. Instead of using raw video, we detect and track human joints, convert them into multi-person spatiotemporal graphs, and apply a **Spatial–Temporal Graph Convolutional Network (ST-GCN)** to classify violent vs. non-violent interactions.
 
@@ -70,6 +72,17 @@ Each window becomes a temporal graph with:
   - velocity  
   - acceleration  
   - confidence  
+
+Feature construction (per joint j at frame t):
+
+```
+coords = (x_j, y_j) / (W, H)        # image-size normalization
+coords = coords - hip_center        # translate to pelvis
+coords = coords / shoulder_length   # body-scale normalization
+vel = coords_t - coords_{t-1}
+acc = vel_t - vel_{t-1}
+feat = [coords, vel, acc, conf]     # 7 channels
+```
 
 These windows are labeled violent/non-violent to train the ST-GCN.
 
@@ -138,6 +151,44 @@ Key configuration:
 | Checkpoint | Best validation accuracy |
 
 Graph convolutions allow the model to propagate information both **spatially** (across joints) and **temporally** (across frames).
+
+![alt text](assets/image-2.png)
+
+---
+
+# **4.1 ST-GCN Details**
+
+**Input tensor:** `(N, C, T, V)` with `C=7` features, `T=30` frames, `V = persons × 17` (e.g., 51 for 3 people).
+
+**Adjacency (multi-person):**
+
+```
+A = blockdiag(A_COCO_person1, A_COCO_person2, A_COCO_person3)
+A += inter_person_hips  # connect nodes 11 and 12 across every pair of persons
+D = diag(1 / sum_j A_ij)
+A_norm = D @ A          # row-normalized degree
+```
+
+**Graph-temporal block:** for features `X ∈ R^{N×C×T×V}`:
+
+```
+# spatial aggregation with fixed A_norm
+X_spatial = einsum("nctv, vw -> nctw", X, A_norm)
+
+# temporal convolution (kernel 9×1) with stride s over T
+X_temporal = Conv2D_kt1(X_spatial)  # only along time, not along joints
+
+# residual path (identity or 1x1 if shape/stride differ)
+Y = ReLU(BN(X_temporal)) + Residual(X)
+Y = Dropout(Y)
+```
+
+**Stack:** channels `[64, 64, 64, 128, 128, 256]`, strides `[1, 1, 1, 2, 1, 2]` (temporal downsampling in blocks 4 and 6). Global average pool over `(T, V)` → linear classifier.
+
+**Why the inter-person edges help (example):**  
+With 2 people (V=34), hips are nodes 11 and 12 for person A and 28 and 29 for person B. Adding edges `(11↔28, 12↔29)` lets the model pass information about relative hip motion/contact, which is a strong cue for fights.
+
+**Effective behavior:** adjacency encodes *who is connected*; normalized, body-scaled features encode *where and how they move*. Zeroed joints (low confidence or far away) send no messages but still receive from neighbors, so uncertainty does not break the graph.
 
 ---
 
