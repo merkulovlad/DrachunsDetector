@@ -8,7 +8,8 @@ title: Violence Recognition From Human Pose Graphs
 
 ---
 
-**The whole code with results you can find on our kaggle notebook** https://www.kaggle.com/code/hubanoid/violence-detection-main 
+### **The whole code with results you can find on our kaggle notebook** 
+https://www.kaggle.com/code/hubanoid/violence-detection-main 
 
 ## **Abstract**
 This project presents a real-time violence detection system built entirely on **graph representations of human pose**. Instead of using raw video, we detect and track human joints, convert them into multi-person spatiotemporal graphs, and apply a **Spatial–Temporal Graph Convolutional Network (ST-GCN)** to classify violent vs. non-violent interactions.
@@ -73,16 +74,21 @@ Each window becomes a temporal graph with:
   - acceleration  
   - confidence  
 
-Feature construction (per joint j at frame t):
+Feature construction (per joint \(j\) at frame \(t\)):
 
-```
-coords = (x_j, y_j) / (W, H)        # image-size normalization
-coords = coords - hip_center        # translate to pelvis
-coords = coords / shoulder_length   # body-scale normalization
-vel = coords_t - coords_{t-1}
-acc = vel_t - vel_{t-1}
-feat = [coords, vel, acc, conf]     # 7 channels
-```
+$$
+\tilde{\mathbf{p}}_{t,j} = \frac{(x_{t,j}, y_{t,j})}{(W, H)} \quad\text{(image normalization)}
+$$
+$$
+\bar{\mathbf{p}}_{t,j} = \frac{\tilde{\mathbf{p}}_{t,j} - \text{hip\_center}_t}{\text{shoulder\_len}_t + \epsilon} \quad\text{(body-scale normalization)}
+$$
+$$
+\mathbf{v}_{t,j} = \bar{\mathbf{p}}_{t,j} - \bar{\mathbf{p}}_{t-1,j}, \quad
+\mathbf{a}_{t,j} = \mathbf{v}_{t,j} - \mathbf{v}_{t-1,j}
+$$
+$$
+\text{feat}_{t,j} = [\,\bar{\mathbf{p}}_{t,j},\ \mathbf{v}_{t,j},\ \mathbf{a}_{t,j},\ \text{conf}_{t,j}\,] \in \mathbb{R}^7
+$$
 
 These windows are labeled violent/non-violent to train the ST-GCN.
 
@@ -162,26 +168,25 @@ Graph convolutions allow the model to propagate information both **spatially** (
 
 **Adjacency (multi-person):**
 
-```
-A = blockdiag(A_COCO_person1, A_COCO_person2, A_COCO_person3)
-A += inter_person_hips  # connect nodes 11 and 12 across every pair of persons
-D = diag(1 / sum_j A_ij)
-A_norm = D @ A          # row-normalized degree
-```
+$$
+A = \operatorname{blockdiag}(A_{\text{COCO}}^{(1)}, A_{\text{COCO}}^{(2)}, A_{\text{COCO}}^{(3)}) + A_{\text{hip-links}}
+$$
+$$
+D = \operatorname{diag}\!\left(\frac{1}{\sum_j A_{ij}}\right), \quad A_{\text{norm}} = D A
+$$
 
-**Graph-temporal block:** for features `X ∈ R^{N×C×T×V}`:
+**Graph-temporal block:** for features $X \in \mathbb{R}^{N\times C\times T\times V}$: 
 
-```
-# spatial aggregation with fixed A_norm
-X_spatial = einsum("nctv, vw -> nctw", X, A_norm)
 
-# temporal convolution (kernel 9×1) with stride s over T
-X_temporal = Conv2D_kt1(X_spatial)  # only along time, not along joints
-
-# residual path (identity or 1x1 if shape/stride differ)
-Y = ReLU(BN(X_temporal)) + Residual(X)
-Y = Dropout(Y)
-```
+$$
+X_{\text{spatial}} = \sum_{w} A_{\text{norm}}[v, w] \, X[:, :, :, w]
+$$
+$$
+X_{\text{temp}} = \text{Conv}_{k_t=9,\,k_v=1}(X_{\text{spatial}})
+$$
+$$
+Y = \operatorname{Dropout}\!\left(\operatorname{ReLU}\!\big(\operatorname{BN}(X_{\text{temp}})\big) + \text{Residual}(X)\right)
+$$
 
 **Stack:** channels `[64, 64, 64, 128, 128, 256]`, strides `[1, 1, 1, 2, 1, 2]` (temporal downsampling in blocks 4 and 6). Global average pool over `(T, V)` → linear classifier.
 
@@ -198,8 +203,9 @@ With 2 people (V=34), hips are nodes 11 and 12 for person A and 28 and 29 for pe
 
 | Metric | Score |
 |--------|-------|
-| **Accuracy** | 0.7286 |
-| **F1-score** | 0.7042 |
+| **Accuracy** | 0.7364 |
+| **F1-score** | 0.7320 |
+| **AUC** | 0.8001 |
 
 Even though transformer-based models outperform it on RGB data, our ST-GCN’s performance is strong given:
 
