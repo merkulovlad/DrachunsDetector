@@ -8,6 +8,8 @@ title: Violence Recognition From Human Pose Graphs
 
 ---
 
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+
 ### **The whole code with results you can find on our kaggle notebook** 
 https://www.kaggle.com/code/hubanoid/violence-detection-main 
 
