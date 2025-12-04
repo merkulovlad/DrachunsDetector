@@ -17,6 +17,14 @@ title: Violence Recognition From Human Pose Graphs
   src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
 </script>
 
+<style>
+  .page-content { font-size: 16px; }
+  .page-content h1 { font-size: 32px; }
+  .page-content h2 { font-size: 26px; }
+  .page-content h3 { font-size: 22px; }
+  .page-content h4 { font-size: 18px; }
+</style>
+
 ### **The whole code with results you can find on our kaggle notebook** 
 [Kaggle Notebook](https://www.kaggle.com/code/hubanoid/violence-detection-main)
 
