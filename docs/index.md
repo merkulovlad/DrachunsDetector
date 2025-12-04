@@ -89,7 +89,7 @@ $$
 \tilde{\mathbf{p}}_{t,j} = \frac{(x_{t,j}, y_{t,j})}{(W, H)} \quad\text{(image normalization)}
 $$
 $$
-\bar{\mathbf{p}}_{t,j} = \frac{\tilde{\mathbf{p}}_{t,j} - \text{hip\_center}_t}{\text{shoulder\_len}_t + \epsilon} \quad\text{(body-scale normalization)}
+\bar{\mathbf{p}}_{t,j} = \frac{\tilde{\mathbf{p}}_{t,j} - \text{hip}_{\text{center},t}}{\text{shoulder}_{\text{len},t} + \epsilon} \quad\text{(body-scale normalization)}
 $$
 $$
 \mathbf{v}_{t,j} = \bar{\mathbf{p}}_{t,j} - \bar{\mathbf{p}}_{t-1,j}, \quad
@@ -98,6 +98,18 @@ $$
 $$
 \text{feat}_{t,j} = [\,\bar{\mathbf{p}}_{t,j},\ \mathbf{v}_{t,j},\ \mathbf{a}_{t,j},\ \text{conf}_{t,j}\,] \in \mathbb{R}^7
 $$
+
+```python
+# feature construction per joint j at frame t
+coords = keypoints[..., :2] / np.array([[W, H]])          # image normalization
+hip_center = coords[:, [11, 12]].mean(axis=1, keepdims=True)
+shoulder_len = np.linalg.norm(coords[:, 5] - coords[:, 6], axis=-1, keepdims=True)
+coords = (coords - hip_center) / (shoulder_len + 1e-6)    # body-scale normalization
+vel = np.zeros_like(coords); vel[1:] = coords[1:] - coords[:-1]
+acc = np.zeros_like(coords); acc[2:] = vel[2:] - vel[1:-1]
+conf = keypoints[..., 2:3]
+feat = np.concatenate([coords, vel, acc, conf], axis=-1)  # (T, 17, 7)
+```
 
 These windows are labeled violent/non-violent to train the ST-GCN.
 
