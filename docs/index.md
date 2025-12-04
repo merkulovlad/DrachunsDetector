@@ -96,13 +96,16 @@ Feature construction (per joint \(j\) at frame \(t\)):
 $$
 \tilde{\mathbf{p}}_{t,j} = \frac{(x_{t,j}, y_{t,j})}{(W, H)} \quad\text{(image normalization)}
 $$
+
 $$
 \bar{\mathbf{p}}_{t,j} = \frac{\tilde{\mathbf{p}}_{t,j} - \text{hip}_{\text{center},t}}{\text{shoulder}_{\text{len},t} + \epsilon} \quad\text{(body-scale normalization)}
 $$
+
 $$
 \mathbf{v}_{t,j} = \bar{\mathbf{p}}_{t,j} - \bar{\mathbf{p}}_{t-1,j}, \quad
 \mathbf{a}_{t,j} = \mathbf{v}_{t,j} - \mathbf{v}_{t-1,j}
 $$
+
 $$
 \text{feat}_{t,j} = [\,\bar{\mathbf{p}}_{t,j},\ \mathbf{v}_{t,j},\ \mathbf{a}_{t,j},\ \text{conf}_{t,j}\,] \in \mathbb{R}^7
 $$
@@ -160,8 +163,6 @@ This allows the graph model to detect:
 - aggressive joint acceleration  
 - physical contact cues  
 
-This is the heart of multi-person graph representation.
-
 ---
 
 # **4. ST-GCN Model**
@@ -171,7 +172,7 @@ Key configuration:
 
 | Component | Specification |
 |----------|--------------|
-| Model | Multi-person ST-GCN |
+| Model | ST-GCN |
 | Adjacency | Block-diagonal COCO + inter-person links |
 | Input channels | 7 |
 | Graph nodes | 51 (3 persons × 17 joints) |
@@ -181,13 +182,8 @@ Key configuration:
 | LR | 3e-4 |
 | Batch size | 32 |
 | Epochs | 10 |
-| Scheduler | Cosine annealing |
-| Device | MPS |
-| Checkpoint | Best validation accuracy |
 
 Graph convolutions allow the model to propagate information both **spatially** (across joints) and **temporally** (across frames).
-
-![alt text](assets/image-2.png)
 
 ---
 
@@ -200,6 +196,7 @@ Graph convolutions allow the model to propagate information both **spatially** (
 $$
 A = \operatorname{blockdiag}(A_{\text{COCO}}^{(1)}, A_{\text{COCO}}^{(2)}, A_{\text{COCO}}^{(3)}) + A_{\text{hip-links}}
 $$
+
 $$
 D = \operatorname{diag}\!\left(\frac{1}{\sum_j A_{ij}}\right), \quad A_{\text{norm}} = D A
 $$
@@ -210,9 +207,11 @@ $$
 $$
 X_{\text{spatial}} = \sum_{w} A_{\text{norm}}[v, w] \, X[:, :, :, w]
 $$
+
 $$
 X_{\text{temp}} = \text{Conv}_{k_t=9,\,k_v=1}(X_{\text{spatial}})
 $$
+
 $$
 Y = \operatorname{Dropout}\!\left(\operatorname{ReLU}\!\big(\operatorname{BN}(X_{\text{temp}})\big) + \text{Residual}(X)\right)
 $$
@@ -241,8 +240,9 @@ Even though transformer-based models outperform it on RGB data, our ST-GCN’s p
 - no raw video  
 - extremely low-dimensional input  
 - real-time inference  
-- high interpretability  
-
+- high interpretability 
+ 
+![alt text](assets/image-2.png)
 ---
 
 # **6. Discussion: Why Graphs Work Well**
@@ -279,10 +279,11 @@ Graph-centric modeling proves to be an elegant and powerful alternative to raw-v
 ---
 
 # **8. References**
-*(GitHub-friendly Markdown)*
 
 1. Ultralytics YOLOv8 Pose – [docs.ultralytics.com](https://docs.ultralytics.com)  
 2. Kalman, R. E. (1960). *A New Approach to Linear Filtering and Prediction Problems.*  
 3. Bewley, A., et al. (2016). *SORT: Simple Online and Realtime Tracking.*  
 4. Kuhn, H. (1955). *The Hungarian Method for the Assignment Problem.*  
 5. Lin, T.-Y. et al. (2014). *Microsoft COCO: Common Objects in Context.*  
+6. Cheng, M., et al. (2020). *RWF-2000: An Open Large Scale Video Database for Violence Detection. In ICPR 2020.*​
+7. Yan, S., Xiong, Y., & Lin, D. (2018). *Spatial Temporal Graph Convolutional Networks for Skeleton-Based Action Recognition (ST-GCN). In AAAI 2018.*

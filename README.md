@@ -1,7 +1,8 @@
 # Violence Detection System
 
 Multi-model violence detection for live camera streams and offline video uploads. The FastAPI app wraps five detectors (ST-GCN, MoViNet, R(2+1)D, ViViT, VideoMAE) with a browser UI and REST/WebSocket APIs.
-
+## Detailed ST-GCN report
+You can access the report in our website https://merkulovlad.github.io/DrachunsDetector/
 ## Repository layout
 - `app/` - FastAPI service (UI, APIs, model wrappers, checkpoints, configs).
 - `ST-GCN/` - ST-GCN training/utilities and demos.
