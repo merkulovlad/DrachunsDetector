@@ -8,7 +8,14 @@ title: Violence Recognition From Human Pose Graphs
 
 ---
 
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+<script>
+  MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+  };
+</script>
+<script id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
 
 ### **The whole code with results you can find on our kaggle notebook** 
 [Kaggle Notebook](https://www.kaggle.com/code/hubanoid/violence-detection-main)
@@ -225,10 +232,8 @@ Graph representation enables:
 Edges and nodes correspond to body structure and motion.
 
 ### ✔ **Efficiency**  
-Only 51 nodes → tiny computation footprint.
+Only 51 nodes for 3 persons → tiny computation footprint.
 
-### ✔ **Robustness**  
-Insensitive to lighting, background, or video noise.
 
 ### ✔ **Explicit knowledge encoding**  
 The graph structure itself represents domain knowledge:
@@ -236,7 +241,6 @@ The graph structure itself represents domain knowledge:
 - motion continuity  
 - human interaction patterns  
 
-This makes the project a natural fit for a **Knowledge Representation in Graphs** course.
 
 ---
 
