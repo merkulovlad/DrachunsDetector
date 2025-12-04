@@ -11,7 +11,7 @@ title: Violence Recognition From Human Pose Graphs
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
 
 ### **The whole code with results you can find on our kaggle notebook** 
-https://www.kaggle.com/code/hubanoid/violence-detection-main 
+[Kaggle Notebook](https://www.kaggle.com/code/hubanoid/violence-detection-main)
 
 ## **Abstract**
 This project presents a real-time violence detection system built entirely on **graph representations of human pose**. Instead of using raw video, we detect and track human joints, convert them into multi-person spatiotemporal graphs, and apply a **Spatial–Temporal Graph Convolutional Network (ST-GCN)** to classify violent vs. non-violent interactions.
@@ -177,7 +177,7 @@ $$
 D = \operatorname{diag}\!\left(\frac{1}{\sum_j A_{ij}}\right), \quad A_{\text{norm}} = D A
 $$
 
-**Graph-temporal block:** for features $X \in \mathbb{R}^{N\times C\times T\times V}$: 
+**Graph-temporal block:** for features \(X \in \mathbb{R}^{N\times C\times T\times V}\): 
 
 
 $$
@@ -257,7 +257,7 @@ Graph-centric modeling proves to be an elegant and powerful alternative to raw-v
 # **8. References**
 *(GitHub-friendly Markdown)*
 
-1. Ultralytics YOLOv8 Pose – https://docs.ultralytics.com  
+1. Ultralytics YOLOv8 Pose – [docs.ultralytics.com](https://docs.ultralytics.com)  
 2. Kalman, R. E. (1960). *A New Approach to Linear Filtering and Prediction Problems.*  
 3. Bewley, A., et al. (2016). *SORT: Simple Online and Realtime Tracking.*  
 4. Kuhn, H. (1955). *The Hungarian Method for the Assignment Problem.*  
