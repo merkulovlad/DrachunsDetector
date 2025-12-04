@@ -177,7 +177,7 @@ $$
 D = \operatorname{diag}\!\left(\frac{1}{\sum_j A_{ij}}\right), \quad A_{\text{norm}} = D A
 $$
 
-**Graph-temporal block:** for features \(X \in \mathbb{R}^{N\times C\times T\times V}\): 
+**Graph-temporal block:** for features $X \in \mathbb{R}^{N\times C\times T\times V}$: 
 
 
 $$
