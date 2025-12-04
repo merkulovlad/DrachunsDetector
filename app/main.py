@@ -10,7 +10,7 @@ import logging
 
 # Add project paths
 sys.path.insert(0, str(Path(__file__).parent))  # allow `core`/`models` when running from repo root
-sys.path.insert(0, str(Path(__file__).parent.parent / "main_code"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "ST-GCN"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "stream_platform"))
 
 from core.config import settings

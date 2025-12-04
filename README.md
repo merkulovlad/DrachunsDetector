@@ -4,7 +4,7 @@ Multi-model violence detection for live camera streams and offline video uploads
 
 ## Repository layout
 - `app/` - FastAPI service (UI, APIs, model wrappers, checkpoints, configs).
-- `main_code/` - ST-GCN training/utilities and demos.
+- `ST-GCN/` - ST-GCN training/utilities and demos.
 - `stream_platform/` - MoViNet streaming pipeline with MediaMTX helpers.
 - `notebooks/` - Exploration and training notebooks.
 

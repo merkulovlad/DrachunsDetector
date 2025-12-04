@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 
 # Add project paths
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "main_code"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "ST-GCN"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "stream_platform"))
 
 import torch

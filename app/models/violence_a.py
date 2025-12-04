@@ -1,6 +1,6 @@
 """
 Model A: ST-GCN based violence detection with YOLO pose estimation.
-Based on main_code/ implementation.
+Based on ST-GCN/ implementation.
 """
 import sys
 from pathlib import Path
@@ -14,9 +14,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-# Add main_code to path for imports
-main_code_path = Path(__file__).parent.parent.parent / "main_code"
-sys.path.insert(0, str(main_code_path))
+# Add ST-GCN to path for imports
+stgcn_path = Path(__file__).parent.parent.parent / "ST-GCN"
+sys.path.insert(0, str(stgcn_path))
 
 from config import PoseConfig, TrackConfig, FeatureConfig, RuntimeConfig
 from step2_pose import PoseEstimator
